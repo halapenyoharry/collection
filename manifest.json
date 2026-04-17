@@ -17,6 +17,14 @@
       "path": "experiences/recursive-subdivision/index.html",
       "tags": ["generative", "art", "svg", "procedural"],
       "added": "2026-04-17"
+    },
+    {
+      "id": "configurable-fountain",
+      "title": "Configurable Fountain",
+      "description": "Interactive particle fountain with trailing effects and configurable sources.",
+      "path": "experiences/configurable-fountain/index.html",
+      "tags": ["physics", "particle", "canvas"],
+      "added": "2026-04-17"
     }
   ]
 }
