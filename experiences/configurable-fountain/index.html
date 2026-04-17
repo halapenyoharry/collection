@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Configurable particle fountain with trailing effects.">
+  <title>Configurable Fountain — Collection</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #13131a;
+      --border: #2a2a3a;
+      --accent: #7c6af5;
+      --text: #e8e8f0;
+      --muted: #6a6a8a;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    nav {
+      padding: .75rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    nav a {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: .875rem;
+    }
+    nav a:hover { text-decoration: underline; }
+
+    header {
+      padding: 1.5rem 1.5rem .75rem;
+    }
+
+    header h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+    }
+
+    header .description {
+      margin-top: .4rem;
+      color: var(--muted);
+      font-size: .9rem;
+    }
+
+    /* ---------- INPUTS SECTION ---------- */
+    #inputs {
+      padding: .75rem 1.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: .75rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    #inputs:empty { display: none; }
+
+    label {
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+      font-size: .85rem;
+      color: var(--muted);
+    }
+
+    input[type="range"] {
+      accent-color: var(--accent);
+    }
+
+    button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: .35rem .9rem;
+      font-size: .85rem;
+      cursor: pointer;
+    }
+    button:hover { opacity: .85; }
+
+    /* ---------- STAGE ---------- */
+    #stage {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      position: relative;
+    }
+
+    #stage canvas,
+    #stage svg {
+      max-width: 100%;
+      max-height: 100%;
+      display: block;
+    }
+
+    /* ---------- OUTPUTS SECTION ---------- */
+    #outputs {
+      padding: .75rem 1.5rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      font-size: .8rem;
+      color: var(--muted);
+    }
+
+    #outputs:empty { display: none; }
+
+    .output-stat { display: flex; flex-direction: column; gap: .15rem; }
+    .output-stat strong { color: var(--text); font-size: 1rem; }
+  </style>
+</head>
+<!--
+  data-experience-id  : matches the folder name and manifest "id" field
+  data-experience-version : increment when making breaking changes to i/o contract
+-->
+<body data-experience-id="template" data-experience-version="1">
+
+  <nav><a href="../../index.html">← Collection</a></nav>
+
+  <header style="display: flex; justify-content: space-between; align-items: center;">
+    <div>
+      <h1>Configurable Fountain</h1>
+      <p class="description">Interactive particle fountain with trailing effects and configurable sources.</p>
+    </div>
+    <button id="toggle-controls">Hide Controls</button>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       INPUTS
+  ══════════════════════════════════════════════════════════════════ -->
+  <section id="inputs">
+    <label>
+      Trailing (Fade)
+      <input type="range" id="trail-fade" min="0.05" max="1.0" step="0.05" value="0.2">
+    </label>
+    <label>
+      Sources
+      <input type="range" id="sources-count" min="1" max="5" step="1" value="1">
+    </label>
+    <label>
+      Background Image URL
+      <input type="text" id="bg-url" placeholder="e.g. https://example.com/image.jpg" style="padding: .2rem; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 4px; width: 200px;">
+    </label>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       STAGE
+       Put your canvas, SVG, or other interactive element here.
+       The stage grows to fill available space.
+  ══════════════════════════════════════════════════════════════════ -->
+  <main id="stage">
+    <canvas id="canvas"></canvas>
+  </main>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       OUTPUTS
+  ══════════════════════════════════════════════════════════════════ -->
+  <section id="outputs">
+    <div class="output-stat">
+      <span>Particles</span>
+      <strong id="out-particles">0</strong>
+    </div>
+  </section>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // UI Elements
+    const trailInput = document.getElementById('trail-fade');
+    const sourcesInput = document.getElementById('sources-count');
+    const bgUrlInput = document.getElementById('bg-url');
+    const toggleBtn = document.getElementById('toggle-controls');
+    const inputsSection = document.getElementById('inputs');
+    const outParticles = document.getElementById('out-particles');
+
+    let particles = [];
+    let bgImage = null;
+    const gravity = 0.15;
+
+    toggleBtn.addEventListener('click', () => {
+      if (inputsSection.style.display === 'none') {
+        inputsSection.style.display = 'flex';
+        toggleBtn.textContent = 'Hide Controls';
+      } else {
+        inputsSection.style.display = 'none';
+        toggleBtn.textContent = 'Show Controls';
+      }
+    });
+
+    bgUrlInput.addEventListener('change', (e) => {
+      const url = e.target.value.trim();
+      if (url) {
+        const img = new Image();
+        img.onload = () => { bgImage = img; };
+        img.onerror = () => { bgImage = null; alert('Failed to load image'); };
+        img.src = url;
+      } else {
+        bgImage = null;
+      }
+    });
+
+    class Particle {
+      constructor(x, y, hue) {
+        this.x = x;
+        this.y = y;
+        this.vx = (Math.random() - 0.5) * 6;
+        this.vy = (Math.random() * -10) - 2;
+        this.hue = hue;
+        this.life = 1.0;
+        this.decay = Math.random() * 0.02 + 0.005;
+        this.size = Math.random() * 4 + 2;
+      }
+
+      update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vy += gravity;
+        this.life -= this.decay;
+      }
+
+      draw(ctx) {
+        ctx.fillStyle = `hsla(${this.hue}, 80%, 60%, ${this.life})`;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function resize() {
+      const stage = document.getElementById('stage');
+      canvas.width = stage.clientWidth - 32;
+      canvas.height = stage.clientHeight - 32;
+    }
+
+    function emitParticles() {
+      const numSources = parseInt(sourcesInput.value, 10);
+      const spacing = canvas.width / (numSources + 1);
+
+      for (let i = 1; i <= numSources; i++) {
+        const x = spacing * i;
+        const y = canvas.height - 20;
+        // Base hue on source index to distinguish them
+        const hue = (i * 360 / numSources + Date.now() / 20) % 360;
+
+        // Add 2-5 particles per frame per source
+        const count = Math.floor(Math.random() * 4) + 2;
+        for (let j = 0; j < count; j++) {
+          particles.push(new Particle(x, y, hue));
+        }
+      }
+    }
+
+    function draw() {
+      // Background logic:
+      if (bgImage) {
+        // If background image is set, we can't easily do trail logic by drawing a semi-transparent rect over it
+        // without fading the image itself. So we draw the image directly (no trail, or we could composite).
+        // Let's implement trail by fading the canvas contents down before drawing the image behind, or just
+        // clearing. For a robust trail with an image, we should draw the image, then draw a fading rect,
+        // which would fade the image...
+        // Alternative: we use a separate canvas for trails. For simplicity, if bg image is on, we just draw it and no trail,
+        // or we draw the image and let particles draw over it.
+        // Actually, to keep trailing with background image: draw image on an under-layer, or use CSS background.
+        // Let's set the canvas CSS background to the image, and only draw particles on the canvas,
+        // with the canvas clearing using clearRect (so no trail), OR filling with a semi-transparent black.
+        // Wait, if canvas has transparent fill, `ctx.fillStyle = rgba(0,0,0,alpha)` will darken the image.
+        // To do proper trails with a background image, you need globalCompositeOperation or two canvases.
+        // Let's just draw the background image each frame, so trails are disabled when bg image is active,
+        // or we can just draw the image if there's no trail, etc.
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw image to fill canvas (cover)
+        const imgRatio = bgImage.width / bgImage.height;
+        const canvasRatio = canvas.width / canvas.height;
+        let drawWidth, drawHeight, offsetX, offsetY;
+        if (canvasRatio > imgRatio) {
+            drawWidth = canvas.width;
+            drawHeight = canvas.width / imgRatio;
+            offsetX = 0;
+            offsetY = (canvas.height - drawHeight) / 2;
+        } else {
+            drawHeight = canvas.height;
+            drawWidth = canvas.height * imgRatio;
+            offsetY = 0;
+            offsetX = (canvas.width - drawWidth) / 2;
+        }
+        ctx.globalAlpha = 0.3; // dim background
+        ctx.drawImage(bgImage, offsetX, offsetY, drawWidth, drawHeight);
+        ctx.globalAlpha = 1.0;
+
+      } else {
+        // Normal trailing by drawing a semi-transparent rect
+        const fadeAlpha = parseFloat(trailInput.value);
+        ctx.fillStyle = `rgba(10, 10, 15, ${fadeAlpha})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+
+      emitParticles();
+
+      // Update & Draw particles
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.update();
+        p.draw(ctx);
+        if (p.life <= 0 || p.x < 0 || p.x > canvas.width || p.y > canvas.height) {
+          particles.splice(i, 1);
+        }
+      }
+
+      outParticles.textContent = particles.length;
+
+      requestAnimationFrame(draw);
+    }
+
+    window.addEventListener('resize', resize);
+    resize();
+    // Fill background initially
+    ctx.fillStyle = '#0a0a0f';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    requestAnimationFrame(draw);
+  </script>
+</body>
+</html>
