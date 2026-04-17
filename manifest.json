@@ -1,0 +1,22 @@
+{
+  "title": "Collection — Negentropic Explorations",
+  "description": "A living gallery of self-contained web experiences.",
+  "experiences": [
+    {
+      "id": "bouncing-balls",
+      "title": "Bouncing Balls",
+      "description": "A simple 2-D physics simulation: balls bounce around a canvas with gravity and elastic collisions.",
+      "path": "experiences/bouncing-balls/index.html",
+      "tags": ["physics", "simulation", "canvas"],
+      "added": "2026-04-17"
+    },
+    {
+      "id": "procedural-art",
+      "title": "Procedural Art",
+      "description": "Generative vector patterns built from recursive subdivision and colour harmonics.",
+      "path": "experiences/procedural-art/index.html",
+      "tags": ["generative", "art", "svg", "procedural"],
+      "added": "2026-04-17"
+    }
+  ]
+}
