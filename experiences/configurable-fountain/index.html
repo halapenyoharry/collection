@@ -150,6 +150,24 @@
       <input type="range" id="sources-count" min="1" max="5" step="1" value="1">
     </label>
     <label>
+      Particle Size
+      <input type="range" id="particle-size" min="1" max="15" step="0.5" value="4">
+    </label>
+    <label>
+      Animation Speed
+      <input type="range" id="anim-speed" min="0.2" max="2.0" step="0.1" value="1.0">
+    </label>
+    <label>
+      Color Scheme
+      <select id="color-scheme" style="padding: .2rem; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 4px;">
+        <option value="viridis">Viridis (D3)</option>
+        <option value="turbo">Turbo (D3)</option>
+        <option value="magma">Magma (D3)</option>
+        <option value="rainbow">Rainbow</option>
+        <option value="cool">Cool</option>
+      </select>
+    </label>
+    <label>
       Background Image URL
       <input type="text" id="bg-url" placeholder="e.g. https://example.com/image.jpg" style="padding: .2rem; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 4px; width: 200px;">
     </label>
@@ -181,6 +199,9 @@
     // UI Elements
     const trailInput = document.getElementById('trail-fade');
     const sourcesInput = document.getElementById('sources-count');
+    const sizeInput = document.getElementById('particle-size');
+    const speedInput = document.getElementById('anim-speed');
+    const colorSchemeSelect = document.getElementById('color-scheme');
     const bgUrlInput = document.getElementById('bg-url');
     const toggleBtn = document.getElementById('toggle-controls');
     const inputsSection = document.getElementById('inputs');
@@ -188,7 +209,96 @@
 
     let particles = [];
     let bgImage = null;
-    const gravity = 0.15;
+    const baseGravity = 0.15;
+
+    // ── D3-style Color Interpolators (Simplified implementation) ────
+    const interpolators = {
+      viridis: (t) => {
+        // Approximate Viridis: dark purple -> blue -> green -> yellow
+        const r = Math.floor(255 * (0.267 + 0.7 * t));
+        const g = Math.floor(255 * (0.005 + 0.9 * t));
+        const b = Math.floor(255 * (0.329 + 0.1 * (1 - t)));
+        return `rgb(${r}, ${g}, ${b})`;
+      },
+      turbo: (t) => {
+        // Approximate Turbo: blue -> cyan -> green -> yellow -> red
+        const r = Math.floor(255 * Math.sin(t * Math.PI));
+        const g = Math.floor(255 * Math.sin(t * Math.PI + 0.5));
+        const b = Math.floor(255 * Math.cos(t * Math.PI * 0.5));
+        return `rgb(${r}, ${g}, ${b})`;
+      },
+      magma: (t) => {
+        const r = Math.floor(255 * Math.pow(t, 0.5));
+        const g = Math.floor(255 * Math.pow(t, 1.5));
+        const b = Math.floor(255 * Math.pow(t, 3.0));
+        return `rgb(${r}, ${g}, ${b})`;
+      },
+      rainbow: (t) => `hsl(${t * 360}, 80%, 60%)`,
+      cool: (t) => `hsl(${180 + t * 60}, 80%, 60%)`
+    };
+
+    function getColor(t) {
+      const scheme = colorSchemeSelect.value;
+      return interpolators[scheme](t);
+    }
+
+    class Particle {
+      constructor(x, y, t) {
+        const speedMult = parseFloat(speedInput.value);
+        this.x = x;
+        this.y = y;
+        this.vx = (Math.random() - 0.5) * 6 * speedMult;
+        this.vy = ((Math.random() * -10) - 2) * speedMult;
+        this.t = t; // normalized value [0, 1] for color
+        this.life = 1.0;
+        this.decay = (Math.random() * 0.02 + 0.005) * (1 / speedMult);
+        this.baseSize = parseFloat(sizeInput.value);
+        this.size = this.baseSize * (0.5 + Math.random() * 0.5);
+      }
+
+      update() {
+        const speedMult = parseFloat(speedInput.value);
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vy += baseGravity * speedMult;
+        this.life -= this.decay;
+      }
+
+      draw(ctx) {
+        const color = getColor(this.t);
+        ctx.save();
+        ctx.globalAlpha = this.life;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    function resize() {
+      const stage = document.getElementById('stage');
+      canvas.width = stage.clientWidth - 32;
+      canvas.height = stage.clientHeight - 32;
+    }
+
+    function emitParticles() {
+      const numSources = parseInt(sourcesInput.value, 10);
+      const spacing = canvas.width / (numSources + 1);
+
+      for (let i = 1; i <= numSources; i++) {
+        const x = spacing * i;
+        const y = canvas.height - 20;
+        
+        // Use normalized position or time for color variation
+        const t = (i / (numSources + 1) + Date.now() / 5000) % 1.0;
+
+        const count = Math.floor(Math.random() * 4) + 2;
+        for (let j = 0; j < count; j++) {
+          particles.push(new Particle(x, y, t));
+        }
+      }
+    }
 
     toggleBtn.addEventListener('click', () => {
       if (inputsSection.style.display === 'none') {
@@ -211,57 +321,6 @@
         bgImage = null;
       }
     });
-
-    class Particle {
-      constructor(x, y, hue) {
-        this.x = x;
-        this.y = y;
-        this.vx = (Math.random() - 0.5) * 6;
-        this.vy = (Math.random() * -10) - 2;
-        this.hue = hue;
-        this.life = 1.0;
-        this.decay = Math.random() * 0.02 + 0.005;
-        this.size = Math.random() * 4 + 2;
-      }
-
-      update() {
-        this.x += this.vx;
-        this.y += this.vy;
-        this.vy += gravity;
-        this.life -= this.decay;
-      }
-
-      draw(ctx) {
-        ctx.fillStyle = `hsla(${this.hue}, 80%, 60%, ${this.life})`;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-
-    function resize() {
-      const stage = document.getElementById('stage');
-      canvas.width = stage.clientWidth - 32;
-      canvas.height = stage.clientHeight - 32;
-    }
-
-    function emitParticles() {
-      const numSources = parseInt(sourcesInput.value, 10);
-      const spacing = canvas.width / (numSources + 1);
-
-      for (let i = 1; i <= numSources; i++) {
-        const x = spacing * i;
-        const y = canvas.height - 20;
-        // Base hue on source index to distinguish them
-        const hue = (i * 360 / numSources + Date.now() / 20) % 360;
-
-        // Add 2-5 particles per frame per source
-        const count = Math.floor(Math.random() * 4) + 2;
-        for (let j = 0; j < count; j++) {
-          particles.push(new Particle(x, y, hue));
-        }
-      }
-    }
 
     function draw() {
       // Background logic:
