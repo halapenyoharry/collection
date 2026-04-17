@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="A simple 2-D physics simulation: balls bounce around a canvas with gravity and elastic collisions.">
+  <title>Bouncing Balls — Collection</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #13131a;
+      --border: #2a2a3a;
+      --accent: #7c6af5;
+      --text: #e8e8f0;
+      --muted: #6a6a8a;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    nav {
+      padding: .6rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    nav a { color: var(--accent); text-decoration: none; font-size: .875rem; }
+    nav a:hover { text-decoration: underline; }
+
+    header {
+      padding: .75rem 1.25rem .4rem;
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 1.3rem; font-weight: 700; }
+    header .description { margin-top: .25rem; color: var(--muted); font-size: .8rem; }
+
+    #inputs {
+      padding: .5rem 1.25rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: .9rem;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      align-items: center;
+    }
+
+    label {
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+      font-size: .8rem;
+      color: var(--muted);
+    }
+    input[type="range"] { accent-color: var(--accent); width: 90px; }
+
+    button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: .3rem .8rem;
+      font-size: .8rem;
+      cursor: pointer;
+    }
+    button:hover { opacity: .85; }
+
+    #stage {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    #outputs {
+      padding: .5rem 1.25rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 2rem;
+      font-size: .75rem;
+      color: var(--muted);
+      flex-shrink: 0;
+      align-items: center;
+    }
+    .output-stat { display: flex; gap: .35rem; align-items: baseline; }
+    .output-stat strong { color: var(--text); font-size: .9rem; }
+  </style>
+</head>
+<body data-experience-id="bouncing-balls" data-experience-version="1">
+
+  <nav><a href="../../index.html">← Collection</a></nav>
+
+  <header>
+    <h1>Bouncing Balls</h1>
+    <p class="description">2-D physics — gravity, elastic wall collisions, and ball-to-ball interactions.</p>
+  </header>
+
+  <section id="inputs">
+    <label>
+      Balls
+      <input type="range" id="ctrl-count" min="1" max="80" value="20">
+      <span id="val-count">20</span>
+    </label>
+    <label>
+      Gravity
+      <input type="range" id="ctrl-gravity" min="0" max="40" value="10" step="1">
+      <span id="val-gravity">10</span>
+    </label>
+    <label>
+      Restitution
+      <input type="range" id="ctrl-restitution" min="0" max="100" value="85">
+      <span id="val-restitution">0.85</span>
+    </label>
+    <button id="btn-reset">Reset</button>
+  </section>
+
+  <main id="stage">
+    <canvas id="canvas"></canvas>
+  </main>
+
+  <section id="outputs">
+    <div class="output-stat"><span>Balls</span><strong id="out-count">0</strong></div>
+    <div class="output-stat"><span>FPS</span><strong id="out-fps">0</strong></div>
+    <div class="output-stat"><span>Total KE</span><strong id="out-ke">0</strong></div>
+  </section>
+
+  <script>
+    'use strict';
+
+    // ── Canvas setup ──────────────────────────────────────────────────
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    function syncCanvasSize() {
+      canvas.width = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+    }
+
+    // ── Physics parameters ────────────────────────────────────────────
+    let GRAVITY     = 10;
+    let RESTITUTION = 0.85;
+    let BALL_COUNT  = 20;
+
+    const MIN_R = 8;
+    const MAX_R = 22;
+    const FRICTION = 0.9995; // velocity multiplier per frame (air drag)
+
+    // ── Ball state ────────────────────────────────────────────────────
+    const PALETTE = ['#7c6af5','#f5a623','#4ecca3','#f26d85','#61c0ff','#f5e642'];
+    let balls = [];
+
+    function randomBall() {
+      const r = MIN_R + Math.random() * (MAX_R - MIN_R);
+      return {
+        x: r + Math.random() * (canvas.width  - 2 * r),
+        y: r + Math.random() * (canvas.height / 2),
+        vx: (Math.random() - .5) * 6,
+        vy: (Math.random() - .5) * 6,
+        r,
+        color: PALETTE[Math.floor(Math.random() * PALETTE.length)],
+      };
+    }
+
+    function initBalls() {
+      syncCanvasSize();
+      balls = Array.from({ length: BALL_COUNT }, randomBall);
+    }
+
+    // ── Physics step ──────────────────────────────────────────────────
+    const DT = 1 / 60;
+
+    function stepPhysics() {
+      const W = canvas.width;
+      const H = canvas.height;
+
+      for (const b of balls) {
+        b.vy += GRAVITY * DT;
+        b.vx *= FRICTION;
+        b.vy *= FRICTION;
+        b.x  += b.vx;
+        b.y  += b.vy;
+
+        // Wall collisions
+        if (b.x - b.r < 0)  { b.x = b.r;    b.vx = Math.abs(b.vx) * RESTITUTION; }
+        if (b.x + b.r > W)  { b.x = W - b.r; b.vx = -Math.abs(b.vx) * RESTITUTION; }
+        if (b.y - b.r < 0)  { b.y = b.r;    b.vy = Math.abs(b.vy) * RESTITUTION; }
+        if (b.y + b.r > H)  { b.y = H - b.r; b.vy = -Math.abs(b.vy) * RESTITUTION; }
+      }
+
+      // Ball-to-ball elastic collisions (O(n²) but fine for ≤80 balls)
+      for (let i = 0; i < balls.length; i++) {
+        for (let j = i + 1; j < balls.length; j++) {
+          const a = balls[i], b = balls[j];
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const minDist = a.r + b.r;
+
+          if (dist < minDist && dist > 0) {
+            // Separate
+            const overlap = (minDist - dist) / 2;
+            const nx = dx / dist;
+            const ny = dy / dist;
+            a.x -= nx * overlap;
+            a.y -= ny * overlap;
+            b.x += nx * overlap;
+            b.y += ny * overlap;
+
+            // Exchange velocity along collision normal (equal mass approx)
+            const dvx = a.vx - b.vx;
+            const dvy = a.vy - b.vy;
+            const dot = dvx * nx + dvy * ny;
+            if (dot > 0) {
+              const impulse = dot * RESTITUTION;
+              a.vx -= impulse * nx;
+              a.vy -= impulse * ny;
+              b.vx += impulse * nx;
+              b.vy += impulse * ny;
+            }
+          }
+        }
+      }
+    }
+
+    // ── Rendering ─────────────────────────────────────────────────────
+    function render() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Background
+      ctx.fillStyle = '#13131a';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      for (const b of balls) {
+        // Glow
+        const grd = ctx.createRadialGradient(b.x - b.r * .3, b.y - b.r * .3, b.r * .1, b.x, b.y, b.r);
+        grd.addColorStop(0, b.color + 'cc');
+        grd.addColorStop(1, b.color + '33');
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+        ctx.fillStyle = grd;
+        ctx.fill();
+      }
+    }
+
+    // ── Stats ─────────────────────────────────────────────────────────
+    let lastTime = performance.now();
+    let fps = 0;
+
+    function updateStats() {
+      const now = performance.now();
+      fps = Math.round(1000 / (now - lastTime));
+      lastTime = now;
+
+      let ke = 0;
+      for (const b of balls) ke += .5 * (b.vx * b.vx + b.vy * b.vy);
+
+      document.getElementById('out-count').textContent = balls.length;
+      document.getElementById('out-fps').textContent = fps;
+      document.getElementById('out-ke').textContent = ke.toFixed(1);
+    }
+
+    // ── Loop ──────────────────────────────────────────────────────────
+    function loop() {
+      stepPhysics();
+      render();
+      updateStats();
+      requestAnimationFrame(loop);
+    }
+
+    // ── Controls ──────────────────────────────────────────────────────
+    function bindControls() {
+      const ctrlCount = document.getElementById('ctrl-count');
+      const ctrlGravity = document.getElementById('ctrl-gravity');
+      const ctrlRestitution = document.getElementById('ctrl-restitution');
+
+      ctrlCount.addEventListener('input', () => {
+        document.getElementById('val-count').textContent = ctrlCount.value;
+        BALL_COUNT = +ctrlCount.value;
+        while (balls.length < BALL_COUNT) balls.push(randomBall());
+        while (balls.length > BALL_COUNT) balls.pop();
+      });
+
+      ctrlGravity.addEventListener('input', () => {
+        GRAVITY = +ctrlGravity.value;
+        document.getElementById('val-gravity').textContent = GRAVITY;
+      });
+
+      ctrlRestitution.addEventListener('input', () => {
+        RESTITUTION = ctrlRestitution.value / 100;
+        document.getElementById('val-restitution').textContent = RESTITUTION.toFixed(2);
+      });
+
+      document.getElementById('btn-reset').addEventListener('click', initBalls);
+    }
+
+    // ── Init ──────────────────────────────────────────────────────────
+    window.addEventListener('resize', () => {
+      syncCanvasSize();
+    });
+
+    bindControls();
+    initBalls();
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>

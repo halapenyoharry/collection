@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Template for a Collection experience. Replace this description.">
+  <title>Experience Title — Collection</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #13131a;
+      --border: #2a2a3a;
+      --accent: #7c6af5;
+      --text: #e8e8f0;
+      --muted: #6a6a8a;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    nav {
+      padding: .75rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    nav a {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: .875rem;
+    }
+    nav a:hover { text-decoration: underline; }
+
+    header {
+      padding: 1.5rem 1.5rem .75rem;
+    }
+
+    header h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+    }
+
+    header .description {
+      margin-top: .4rem;
+      color: var(--muted);
+      font-size: .9rem;
+    }
+
+    /* ---------- INPUTS SECTION ---------- */
+    #inputs {
+      padding: .75rem 1.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: .75rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    #inputs:empty { display: none; }
+
+    label {
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+      font-size: .85rem;
+      color: var(--muted);
+    }
+
+    input[type="range"] {
+      accent-color: var(--accent);
+    }
+
+    button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: .35rem .9rem;
+      font-size: .85rem;
+      cursor: pointer;
+    }
+    button:hover { opacity: .85; }
+
+    /* ---------- STAGE ---------- */
+    #stage {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      position: relative;
+    }
+
+    #stage canvas,
+    #stage svg {
+      max-width: 100%;
+      max-height: 100%;
+      display: block;
+    }
+
+    /* ---------- OUTPUTS SECTION ---------- */
+    #outputs {
+      padding: .75rem 1.5rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      font-size: .8rem;
+      color: var(--muted);
+    }
+
+    #outputs:empty { display: none; }
+
+    .output-stat { display: flex; flex-direction: column; gap: .15rem; }
+    .output-stat strong { color: var(--text); font-size: 1rem; }
+  </style>
+</head>
+<!--
+  data-experience-id  : matches the folder name and manifest "id" field
+  data-experience-version : increment when making breaking changes to i/o contract
+-->
+<body data-experience-id="template" data-experience-version="1">
+
+  <nav><a href="../../index.html">← Collection</a></nav>
+
+  <header>
+    <h1>Experience Title</h1>
+    <p class="description">One line description of what this experience does.</p>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       INPUTS
+       Add sliders, buttons, colour pickers, text fields here.
+       Keep them simple and label everything.
+  ══════════════════════════════════════════════════════════════════ -->
+  <section id="inputs">
+    <!-- Example input — remove or replace:
+    <label>
+      Speed
+      <input type="range" id="speed" min="1" max="20" value="5">
+    </label>
+    <button id="reset">Reset</button>
+    -->
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       STAGE
+       Put your canvas, SVG, or other interactive element here.
+       The stage grows to fill available space.
+  ══════════════════════════════════════════════════════════════════ -->
+  <main id="stage">
+    <canvas id="canvas"></canvas>
+  </main>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       OUTPUTS
+       Live stats, computed values, export buttons go here.
+  ══════════════════════════════════════════════════════════════════ -->
+  <section id="outputs">
+    <!-- Example output — remove or replace:
+    <div class="output-stat">
+      <span>Frame</span>
+      <strong id="out-frame">0</strong>
+    </div>
+    -->
+  </section>
+
+  <script>
+    // ─────────────────────────────────────────────────────────────────
+    //  TEMPLATE SCRIPT — replace this entire block with your experience
+    // ─────────────────────────────────────────────────────────────────
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    function resize() {
+      const stage = document.getElementById('stage');
+      canvas.width = stage.clientWidth - 32;
+      canvas.height = stage.clientHeight - 32;
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#13131a';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Placeholder text
+      ctx.fillStyle = '#6a6a8a';
+      ctx.font = `${Math.min(canvas.width / 15, 28)}px system-ui`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Replace this with your experience ✦', canvas.width / 2, canvas.height / 2);
+    }
+
+    window.addEventListener('resize', () => { resize(); draw(); });
+    resize();
+    draw();
+  </script>
+</body>
+</html>
