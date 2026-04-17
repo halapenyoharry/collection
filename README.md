@@ -21,7 +21,7 @@ collection/
 └── experiences/
     ├── template/           ← Copy this when making a new experience
     ├── bouncing-balls/     ← 2-D physics simulation
-    └── procedural-art/     ← Recursive generative vector art
+    └── recursive-subdivision/     ← Recursive generative vector art
 ```
 
 ## Adding a new experience

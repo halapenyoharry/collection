@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="Generative vector patterns built from recursive subdivision and colour harmonics.">
-  <title>Procedural Art — Collection</title>
+  <title>Recursive Subdivision — Collection</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -115,12 +115,12 @@
     .output-stat strong { color: var(--text); font-size: .9rem; }
   </style>
 </head>
-<body data-experience-id="procedural-art" data-experience-version="1">
+<body data-experience-id="recursive-subdivision" data-experience-version="1">
 
   <nav><a href="../../index.html">← Collection</a></nav>
 
   <header>
-    <h1>Procedural Art</h1>
+    <h1>Recursive Subdivision</h1>
     <p class="description">Recursive subdivision of space — each seed grows a unique composition.</p>
   </header>
 
@@ -317,7 +317,7 @@
       const blob = new Blob([svg.outerHTML], { type: 'image/svg+xml' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = `procedural-art-${currentSeed.toString(16)}.svg`;
+      a.download = `recursive-subdivision-${currentSeed.toString(16)}.svg`;
       a.click();
     });
 

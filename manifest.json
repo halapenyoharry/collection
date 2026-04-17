@@ -11,10 +11,10 @@
       "added": "2026-04-17"
     },
     {
-      "id": "procedural-art",
-      "title": "Procedural Art",
+      "id": "recursive-subdivision",
+      "title": "Recursive Subdivision",
       "description": "Generative vector patterns built from recursive subdivision and colour harmonics.",
-      "path": "experiences/procedural-art/index.html",
+      "path": "experiences/recursive-subdivision/index.html",
       "tags": ["generative", "art", "svg", "procedural"],
       "added": "2026-04-17"
     }
