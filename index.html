@@ -168,7 +168,7 @@
       for (const exp of manifest.experiences) {
         const card = document.createElement('a');
         card.className = 'card';
-        card.href = exp.path;
+        card.href = exp.url || exp.path;
 
         const tags = (exp.tags || []).map(t => `<span class="tag">${t}</span>`).join('');
 
