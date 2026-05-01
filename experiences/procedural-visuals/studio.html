@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Procedural Visuals Studio</title>
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --panel-bg: #141414;
+      --border: #222;
+      --accent: #c8a050;
+      --accent-hover: #ddb060;
+      --text: #e0d8c8;
+      --text-muted: #807060;
+      --panel-width: 300px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: 'Courier New', monospace;
+      background-color: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    header {
+      background: #000;
+      padding: 10px 20px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      text-transform: uppercase;
+      font-size: 14px;
+    }
+
+    .workspace {
+      display: flex;
+      flex: 1;
+      height: calc(100vh - 41px);
+    }
+
+    /* Side Panels */
+    .panel {
+      background: var(--panel-bg);
+      width: var(--panel-width);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+    .panel.left { border-right: 1px solid var(--border); }
+    .panel.right { border-left: 1px solid var(--border); }
+
+    .panel-header {
+      padding: 12px 15px;
+      background: #1a1a1a;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      border-bottom: 1px solid var(--border);
+      color: var(--accent);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .panel-content {
+      padding: 15px;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    /* Central Viewport */
+    .viewport {
+      flex: 1;
+      background: #050505;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #canvas-stack {
+      position: relative;
+      box-shadow: 0 0 40px rgba(0,0,0,0.5);
+      background: #000;
+      cursor: crosshair;
+    }
+    #canvas-stack canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    /* UI Controls */
+    button {
+      width: 100%;
+      padding: 8px 12px;
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      transition: all 0.2s;
+    }
+    button:hover { border-color: var(--accent); color: var(--accent); }
+    button.primary { background: var(--accent); color: #000; border: none; font-weight: bold; }
+    button.primary:hover { background: var(--accent-hover); }
+
+    .layer-item {
+      background: #1a1a1a;
+      padding: 10px;
+      margin-bottom: 8px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+    .layer-item:hover { border-color: #444; }
+    .layer-item.active {
+      border-color: var(--accent);
+      background: #221f1a;
+    }
+    .layer-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;}
+    .layer-title { font-weight: bold; font-size: 11px; color: var(--accent); }
+    .layer-tools { display: flex; gap: 5px; }
+    .tool-btn { width: auto; padding: 2px 5px; font-size: 9px; }
+
+    .control-group { margin-bottom: 12px; }
+    .control-group label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-bottom: 5px;
+      text-transform: uppercase;
+    }
+    select, input[type="text"], input[type="number"] {
+      width: 100%;
+      background: #000;
+      color: #fff;
+      border: 1px solid var(--border);
+      padding: 6px;
+      font-family: inherit;
+      font-size: 11px;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 4px;
+      background: #222;
+      outline: none;
+      margin: 10px 0;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      background: var(--accent);
+      cursor: pointer;
+      border-radius: 50%;
+    }
+
+    hr { border: 0; border-top: 1px solid var(--border); margin: 15px 0; }
+
+    .v-stack { display: flex; flex-direction: column; gap: 10px; }
+    .h-stack { display: flex; gap: 10px; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div>Procedural Visuals Studio</div>
+    <div style="font-size: 10px; color: var(--text-muted)">
+      <button onclick="exportComposition()" class="tool-btn">Export PNG</button>
+    </div>
+  </header>
+
+  <div class="workspace">
+
+    <!-- LAYERS PANEL -->
+    <aside class="panel left">
+      <div class="panel-header">
+        Layers
+        <button onclick="createLayer()" class="tool-btn" style="width: auto;">+ Add</button>
+      </div>
+      <div class="panel-content" id="layers-list">
+        <!-- Layer DOM elements -->
+      </div>
+      <div class="panel-header" style="border-top: 1px solid var(--border); border-bottom: none;">
+        Composition
+      </div>
+      <div class="panel-content" style="flex: 0; min-height: 100px;">
+        <div class="control-group">
+          <label>Canvas Width</label>
+          <input type="number" id="canvas-width" value="1200" onchange="resizeWorkspace()">
+        </div>
+        <div class="control-group">
+          <label>Canvas Height</label>
+          <input type="number" id="canvas-height" value="800" onchange="resizeWorkspace()">
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN COMPOSITING VIEWPORT -->
+    <main class="viewport">
+      <div id="canvas-stack">
+        <!-- Canvases -->
+      </div>
+    </main>
+
+    <!-- PROPERTIES PANEL -->
+    <aside class="panel right">
+      <div class="panel-header">Properties</div>
+      <div class="panel-content" id="properties-panel">
+        <!-- Controls -->
+      </div>
+    </aside>
+
+  </div>
+
+  <script>
+    // --- UTILITIES ---
+    function mulberry32(a) {
+      return function() {
+        a |= 0; a = a + 0x6D2B79F5 | 0;
+        var t = Math.imul(a ^ a >>> 15, 1 | a);
+        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+      }
+    }
+
+    // --- VISUAL REGISTRY ---
+    const VisualRegistry = {
+      particles: {
+        name: "Particle Swarm",
+        controls: {
+          count: { type: 'range', min: 10, max: 2000, value: 500, label: 'Count' },
+          speed: { type: 'range', min: 0.1, max: 10, value: 2, label: 'Speed' },
+          hue: { type: 'range', min: 0, max: 360, value: 200, label: 'Hue' }
+        },
+        render: (ctx, w, h, time, p, s) => {
+          if (!s.pts || s.pts.length !== Math.floor(p.count)) {
+            s.pts = Array.from({ length: p.count }, () => ({
+              x: Math.random() * w, y: Math.random() * h,
+              vx: (Math.random() - 0.5) * p.speed, vy: (Math.random() - 0.5) * p.speed
+            }));
+          }
+          ctx.clearRect(0, 0, w, h);
+          s.pts.forEach((pt, i) => {
+            pt.x += pt.vx; pt.y += pt.vy;
+            if (pt.x < 0 || pt.x > w) pt.vx *= -1;
+            if (pt.y < 0 || pt.y > h) pt.vy *= -1;
+            ctx.fillStyle = `hsl(${(p.hue + i * 0.1) % 360}, 70%, 60%)`;
+            ctx.beginPath(); ctx.arc(pt.x, pt.y, 2, 0, Math.PI * 2); ctx.fill();
+          });
+        }
+      },
+      circlePacking: {
+        name: "Orbital Packing",
+        controls: {
+          density: { type: 'range', min: 500, max: 6000, value: 3500, label: 'Pack Attempts' },
+          maxRadius: { type: 'range', min: 60, max: 300, value: 160, label: 'Max Start Radius' },
+          orbitalRings: { type: 'range', min: 1, max: 5, value: 3, label: 'Orbital Rings' },
+          seed: { type: 'range', min: 1, max: 9999, value: 42, label: 'Seed' }
+        },
+        render: (ctx, w, h, time, p, s) => {
+          if (s.built && s.lastSeed === p.seed && s.lastDensity === p.density && s.lastMaxR === p.maxRadius) return;
+          s.built = true; s.lastSeed = p.seed; s.lastDensity = p.density; s.lastMaxR = p.maxRadius;
+          const rng = mulberry32(p.seed);
+          ctx.clearRect(0, 0, w, h);
+          
+          const drawOrbital = (cx, cy, r, depth) => {
+            if (r < 2 || depth > 3) return;
+            ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.strokeStyle = '#c8a050'; ctx.lineWidth = 0.5; ctx.stroke();
+            const num = Math.floor(rng() * p.orbitalRings) + 1;
+            for(let i=0; i<num; i++) {
+              const ang = rng() * Math.PI * 2;
+              const dist = r * 0.6; const nr = r * 0.3;
+              drawOrbital(cx + Math.cos(ang)*dist, cy + Math.sin(ang)*dist, nr, depth+1);
+            }
+          };
+
+          for(let i=0; i<10; i++) drawOrbital(rng()*w, rng()*h, rng()*p.maxRadius, 0);
+        }
+      },
+      life: {
+        name: "Game of Life",
+        controls: {
+          res: { type: 'range', min: 2, max: 20, value: 5, label: 'Pixel Size' },
+          speed: { type: 'range', min: 1, max: 60, value: 30, label: 'Speed' }
+        },
+        render: (ctx, w, h, time, p, s) => {
+          const res = Math.floor(p.res);
+          const cols = Math.ceil(w / res), rows = Math.ceil(h / res);
+          if (!s.grid || s.grid.length !== cols * rows) {
+            s.grid = new Uint8Array(cols * rows).map(() => Math.random() > 0.8 ? 1 : 0);
+            s.next = new Uint8Array(cols * rows);
+            s.lastUpdate = 0;
+          }
+          if (time - s.lastUpdate > (1000 / p.speed)) {
+            s.lastUpdate = time;
+            for (let y = 0; y < rows; y++) {
+              for (let x = 0; x < cols; x++) {
+                let neighbors = 0;
+                for (let i = -1; i <= 1; i++) {
+                  for (let j = -1; j <= 1; j++) {
+                    if (i === 0 && j === 0) continue;
+                    const nx = (x + i + cols) % cols, ny = (y + j + rows) % rows;
+                    neighbors += s.grid[ny * cols + nx];
+                  }
+                }
+                const idx = y * cols + x;
+                if (s.grid[idx] === 1) s.next[idx] = (neighbors === 2 || neighbors === 3) ? 1 : 0;
+                else s.next[idx] = (neighbors === 3) ? 1 : 0;
+              }
+            }
+            [s.grid, s.next] = [s.next, s.grid];
+          }
+          ctx.clearRect(0, 0, w, h);
+          ctx.fillStyle = '#c8a050';
+          for (let y = 0; y < rows; y++) {
+            for (let x = 0; x < cols; x++) {
+              if (s.grid[y * cols + x]) ctx.fillRect(x * res, y * res, res - 1, res - 1);
+            }
+          }
+        }
+      },
+      growth: {
+        name: "Growth",
+        controls: {
+          seeds: { type: 'range', min: 1, max: 50, value: 10, label: 'Seeds' },
+          shades: { type: 'range', min: 2, max: 64, value: 16, label: 'Shades' },
+          seed: { type: 'range', min: 1, max: 9999, value: 42, label: 'Seed' }
+        },
+        render: (ctx, w, h, time, p, s) => {
+          if (s.built && s.lastSeed === p.seed && s.lastSeeds === p.seeds) return;
+          s.built = true; s.lastSeed = p.seed; s.lastSeeds = p.seeds;
+          const rng = mulberry32(p.seed);
+          ctx.clearRect(0, 0, w, h);
+          for(let i=0; i<p.seeds; i++) {
+            const x = rng()*w, y = rng()*h;
+            ctx.fillStyle = `hsl(${rng()*360}, 50%, 50%)`;
+            ctx.beginPath(); ctx.arc(x, y, 50 + rng()*100, 0, Math.PI*2); ctx.fill();
+          }
+        }
+      },
+      topological: {
+        name: "Topological Layer",
+        controls: {
+          coherence: { type: 'range', min: 0, max: 100, value: 70, label: 'Coherence' },
+          observation: { type: 'range', min: 0, max: 100, value: 20, label: 'Observation' },
+          seed: { type: 'range', min: 1, max: 9999, value: 42, label: 'Seed' }
+        },
+        render: (ctx, w, h, time, p, s) => {
+          const rng = mulberry32(p.seed);
+          ctx.clearRect(0, 0, w, h);
+          ctx.strokeStyle = `rgba(200, 180, 150, ${p.coherence / 100})`;
+          ctx.lineWidth = 0.5;
+          for(let i=0; i<5; i++) {
+            const x = rng()*w, y = rng()*h, r = 20 + rng()*100;
+            ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(x-r, y); ctx.lineTo(x+r, y); ctx.stroke();
+          }
+        }
+      },
+      crystalline: {
+        name: "Crystalline",
+        controls: {
+          seeds: { type: 'range', min: 5, max: 50, value: 20, label: 'Seeds' },
+          depth: { type: 'range', min: 1, max: 5, value: 3, label: 'Subdivision' },
+          seed: { type: 'range', min: 1, max: 9999, value: 42, label: 'Seed' }
+        },
+        render: (ctx, w, h, time, p, s) => {
+          if (s.built && s.lastSeed === p.seed && s.lastSeeds === p.seeds && s.lastDepth === p.depth) return;
+          s.built = true; s.lastSeed = p.seed; s.lastSeeds = p.seeds; s.lastDepth = p.depth;
+          const rng = mulberry32(p.seed);
+          ctx.clearRect(0, 0, w, h);
+          const drawFacet = (poly, d) => {
+            if (d > p.depth) {
+              ctx.beginPath(); ctx.moveTo(poly[0].x, poly[0].y);
+              poly.forEach(pt => ctx.lineTo(pt.x, pt.y));
+              ctx.closePath();
+              ctx.fillStyle = `hsl(${200 + rng() * 40}, 30%, ${70 + rng() * 20}%)`;
+              ctx.fill();
+              ctx.strokeStyle = `rgba(0,0,0,0.2)`; ctx.stroke();
+              return;
+            }
+            const mid = poly.reduce((a,b) => ({x:a.x+b.x, y:a.y+b.y}), {x:0,y:0});
+            mid.x /= poly.length; mid.y /= poly.length;
+            mid.x += (rng()-0.5) * 20; mid.y += (rng()-0.5) * 20;
+            for(let i=0; i<poly.length; i++) drawFacet([poly[i], poly[(i+1)%poly.length], mid], d+1);
+          };
+          for(let i=0; i<p.seeds; i++) {
+            const cx = rng()*w, cy = rng()*h, r = 50 + rng()*150;
+            const poly = [];
+            for(let a=0; a<Math.PI*2; a+=Math.PI/3) poly.push({x: cx + Math.cos(a)*r, y: cy + Math.sin(a)*r});
+            drawFacet(poly, 0);
+          }
+        }
+      },
+      quantumLife: {
+        name: "Quantum Life",
+        controls: {
+          hadamard: { type: 'range', min: 0, max: 100, value: 30, label: 'Hadamard %' },
+          phase: { type: 'range', min: 0, max: 100, value: 40, label: 'Phase Rate' },
+          observation: { type: 'range', min: 0, max: 100, value: 5, label: 'Observation' }
+        },
+        render: (ctx, w, h, time, p, s) => {
+          if (!s.grid) {
+            s.grid = new Float32Array(100 * 100).map(() => Math.random());
+            s.lastUpdate = 0;
+          }
+          if (time - s.lastUpdate > 100) {
+            s.lastUpdate = time;
+            // Simple quantum-inspired interference proxy
+            for(let i=0; i<s.grid.length; i++) {
+              s.grid[i] = (s.grid[i] + Math.sin(time*0.001 + i)*0.1 + 1) % 1;
+            }
+          }
+          ctx.clearRect(0, 0, w, h);
+          const res = w / 100;
+          for(let i=0; i<s.grid.length; i++) {
+            const x = i % 100, y = Math.floor(i / 100);
+            ctx.fillStyle = `hsla(${s.grid[i]*360}, 80%, 50%, ${s.grid[i]})`;
+            ctx.fillRect(x*res, y*res, res, res);
+          }
+        }
+      }
+    };
+
+    // --- APP STATE ---
+    let layers = [];
+    let activeLayerId = null;
+    let mouse = { x: 0, y: 0, down: false };
+
+    const canvasStack = document.getElementById('canvas-stack');
+    const layersList = document.getElementById('layers-list');
+    const propertiesPanel = document.getElementById('properties-panel');
+    const cWidthInput = document.getElementById('canvas-width');
+    const cHeightInput = document.getElementById('canvas-height');
+
+    // Mouse Tracking
+    canvasStack.addEventListener('mousemove', e => {
+      const rect = canvasStack.getBoundingClientRect();
+      const scaleX = parseInt(cWidthInput.value) / rect.width;
+      const scaleY = parseInt(cHeightInput.value) / rect.height;
+      mouse.x = (e.clientX - rect.left) * scaleX;
+      mouse.y = (e.clientY - rect.top) * scaleY;
+    });
+    canvasStack.addEventListener('mousedown', () => mouse.down = true);
+    window.addEventListener('mouseup', () => mouse.down = false);
+
+    function createLayer(type = 'particles') {
+      const id = 'layer_' + Date.now() + Math.random().toString(36).substr(2, 5);
+      const canvas = document.createElement('canvas');
+      canvasStack.appendChild(canvas);
+
+      const layer = {
+        id,
+        name: `Layer ${layers.length + 1}`,
+        type,
+        opacity: 1,
+        blendMode: 'screen',
+        visible: true,
+        locked: false,
+        params: {},
+        state: {},
+        canvas,
+        ctx: canvas.getContext('2d')
+      };
+
+      Object.keys(VisualRegistry[type].controls).forEach(k => {
+        layer.params[k] = VisualRegistry[type].controls[k].value;
+      });
+
+      layers.unshift(layer);
+      resizeWorkspace();
+      setActiveLayer(id);
+    }
+
+    function setActiveLayer(id) {
+      activeLayerId = id;
+      renderUI();
+    }
+
+    function toggleVisibility(id) {
+      const l = layers.find(l => l.id === id);
+      if(l) { l.visible = !l.visible; renderUI(); }
+    }
+
+    function toggleLock(id) {
+      const l = layers.find(l => l.id === id);
+      if(l) { l.locked = !l.locked; renderUI(); }
+    }
+
+    function removeLayer(id) {
+      const idx = layers.findIndex(l => l.id === id);
+      if(idx > -1) {
+        if (layers[idx].locked) return alert("Layer is locked.");
+        canvasStack.removeChild(layers[idx].canvas);
+        layers.splice(idx, 1);
+        if(activeLayerId === id) activeLayerId = layers[0]?.id || null;
+        renderUI();
+      }
+    }
+
+    function moveLayer(id, dir) {
+      const idx = layers.findIndex(l => l.id === id);
+      if(idx === -1) return;
+      const newIdx = idx + dir;
+      if(newIdx < 0 || newIdx >= layers.length) return;
+      const [l] = layers.splice(idx, 1);
+      layers.splice(newIdx, 0, l);
+      reorderCanvases();
+      renderUI();
+    }
+
+    function reorderCanvases() {
+      const canvases = [...layers].reverse().map(l => l.canvas);
+      canvasStack.innerHTML = '';
+      canvases.forEach(c => canvasStack.appendChild(c));
+    }
+
+    function renderUI() {
+      layersList.innerHTML = layers.map(l => `
+        <div class="layer-item ${l.id === activeLayerId ? 'active' : ''}" onclick="setActiveLayer('${l.id}')">
+          <div class="layer-header">
+            <span class="layer-title">${l.name}</span>
+            <div class="layer-tools">
+              <button class="tool-btn" onclick="event.stopPropagation(); toggleLock('${l.id}')">${l.locked ? '🔒' : '🔓'}</button>
+              <button class="tool-btn" onclick="event.stopPropagation(); toggleVisibility('${l.id}')">${l.visible ? '👁' : 'Ø'}</button>
+              <button class="tool-btn" onclick="event.stopPropagation(); moveLayer('${l.id}', -1)">↑</button>
+              <button class="tool-btn" onclick="event.stopPropagation(); moveLayer('${l.id}', 1)">↓</button>
+              <button class="tool-btn" style="color:#f55" onclick="event.stopPropagation(); removeLayer('${l.id}')">×</button>
+            </div>
+          </div>
+          <div style="font-size: 9px; color: var(--text-muted);">${VisualRegistry[l.type].name} • ${l.blendMode}</div>
+        </div>
+      `).join('');
+
+      const active = layers.find(l => l.id === activeLayerId);
+      if(!active) {
+        propertiesPanel.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted)">No layer selected</div>';
+        return;
+      }
+
+      let html = `
+        <div class="control-group">
+          <label>Algorithm</label>
+          <select ${active.locked ? 'disabled' : ''} onchange="updateActiveLayer('type', this.value)">
+            ${Object.keys(VisualRegistry).map(k => `<option value="${k}" ${active.type === k ? 'selected' : ''}>${VisualRegistry[k].name}</option>`).join('')}
+          </select>
+        </div>
+        <div class="control-group">
+          <label>Blend Mode</label>
+          <select onchange="updateActiveLayer('blendMode', this.value)">
+            ${['normal', 'screen', 'multiply', 'overlay', 'color-dodge', 'difference', 'exclusion', 'hard-light'].map(m => `<option value="${m}" ${active.blendMode === m ? 'selected' : ''}>${m}</option>`).join('')}
+          </select>
+        </div>
+        <div class="control-group">
+          <label>Opacity <span>${Math.round(active.opacity*100)}%</span></label>
+          <input type="range" min="0" max="1" step="0.01" value="${active.opacity}" oninput="updateActiveLayer('opacity', this.value)">
+        </div>
+        <hr>
+        <div class="v-stack">
+      `;
+
+      const controls = VisualRegistry[active.type].controls;
+      Object.keys(controls).forEach(k => {
+        const c = controls[k];
+        html += `
+          <div class="control-group">
+            <label>${c.label} <span>${active.params[k]}</span></label>
+            <input type="${c.type}" min="${c.min}" max="${c.max}" step="${c.step || 1}" value="${active.params[k]}" oninput="updateActiveLayerParam('${k}', this.value)">
+          </div>
+        `;
+      });
+
+      html += `
+        <button class="tool-btn" onclick="resetActiveLayerState()">Reset Algorithm State</button>
+        </div>
+      `;
+      propertiesPanel.innerHTML = html;
+    }
+
+    window.updateActiveLayer = (prop, val) => {
+      const l = layers.find(l => l.id === activeLayerId);
+      if(!l) return;
+      if(prop === 'type' && l.locked) return;
+      if(prop === 'type') {
+        l.type = val; l.state = {}; l.params = {};
+        Object.keys(VisualRegistry[val].controls).forEach(k => l.params[k] = VisualRegistry[val].controls[k].value);
+      } else { l[prop] = val; }
+      renderUI();
+    };
+
+    window.updateActiveLayerParam = (k, val) => {
+      const l = layers.find(l => l.id === activeLayerId);
+      if(l) { l.params[k] = parseFloat(val); renderUI(); }
+    };
+
+    window.resetActiveLayerState = () => {
+      const l = layers.find(l => l.id === activeLayerId);
+      if(l) { l.state = {}; }
+    };
+
+    function resizeWorkspace() {
+      const w = parseInt(cWidthInput.value);
+      const h = parseInt(cHeightInput.value);
+      canvasStack.style.width = w + 'px';
+      canvasStack.style.height = h + 'px';
+      layers.forEach(l => {
+        l.canvas.width = w;
+        l.canvas.height = h;
+      });
+    }
+
+    function animate(time) {
+      const w = parseInt(cWidthInput.value);
+      const h = parseInt(cHeightInput.value);
+      layers.forEach(l => {
+        if(!l.visible) { l.canvas.style.display = 'none'; return; }
+        l.canvas.style.display = 'block';
+        l.canvas.style.opacity = l.opacity;
+        l.canvas.style.mixBlendMode = l.blendMode;
+        const visual = VisualRegistry[l.type];
+        if(visual) visual.render(l.ctx, w, h, time, l.params, l.state, mouse);
+      });
+      requestAnimationFrame(animate);
+    }
+
+    function exportComposition() {
+      const w = parseInt(cWidthInput.value);
+      const h = parseInt(cHeightInput.value);
+      const off = document.createElement('canvas');
+      off.width = w; off.height = h;
+      const octx = off.getContext('2d');
+      octx.fillStyle = '#000'; octx.fillRect(0,0,w,h);
+      [...layers].reverse().forEach(l => {
+        if(!l.visible) return;
+        octx.globalAlpha = l.opacity;
+        octx.globalCompositeOperation = l.blendMode === 'normal' ? 'source-over' : l.blendMode;
+        octx.drawImage(l.canvas, 0, 0);
+      });
+      const link = document.createElement('a');
+      link.download = `composition_${Date.now()}.png`;
+      link.href = off.toDataURL('image/png');
+      link.click();
+    }
+
+    createLayer('particles');
+    createLayer('circlePacking');
+    resizeWorkspace();
+    requestAnimationFrame(animate);
+
+  </script>
+
+</body>
+</html>

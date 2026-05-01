@@ -1,0 +1,42 @@
+{
+  "nature": "creation",
+  "status": "active",
+  "vision": "A gallery of self-contained web experiences and generative art.",
+  "tags": [
+    "generative-art",
+    "web-experiences",
+    "physics-simulations",
+    "encompassing-gallery"
+  ],
+  "energy": "Highly active with a structured process for adding new experiments.",
+  "original_name": "collection",
+  "slug": "collection",
+  "machine": "lothal.local",
+  "path": "/Users/harold/Projects/collection",
+  "scanner_meta": {
+    "last_scanned": "2026-04-24T03:04:55Z",
+    "scanned_by": "classifier (gemma4:31b)",
+    "last_ai_output": {
+      "nature": "creation",
+      "status": "active",
+      "vision": "A gallery of self-contained web experiences and generative art.",
+      "tags": [
+        "generative-art",
+        "web-experiences",
+        "physics-simulations",
+        "encompassing-gallery"
+      ],
+      "energy": "Highly active with a structured process for adding new experiments.",
+      "original_name": "collection",
+      "slug": "collection",
+      "machine": "lothal.local",
+      "path": "/Users/harold/Projects/collection"
+    }
+  },
+  "appearance": {
+    "primary_color": "#22070a",
+    "accent_color": "#176e65",
+    "source": "algorithmic"
+  },
+  "$schema": "https://vortex.local/schemas/project-bible.schema.json"
+}

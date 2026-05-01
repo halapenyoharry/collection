@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Life</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0908;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+    font-family: 'Courier New', monospace;
+  }
+  #panel {
+    width: 240px;
+    min-width: 240px;
+    padding: 14px;
+    background: #1a1714;
+    border-right: 1px solid #2a2418;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+    color: #8a7a60;
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .cg { display: flex; flex-direction: column; gap: 2px; }
+  .cg label { color: #6a5a40; }
+  .cg input[type="range"] { width: 100%; accent-color: #6a5a40; }
+  .cg .v { text-align: right; color: #8a7a60; }
+  .cg select {
+    background: #1a1714;
+    color: #8a7a60;
+    border: 1px solid #2a2418;
+    font-family: inherit;
+    font-size: 10px;
+    padding: 3px;
+  }
+  button {
+    background: none;
+    border: 1px solid #2a2418;
+    color: #8a7a60;
+    font-family: inherit;
+    font-size: 10px;
+    letter-spacing: 1px;
+    padding: 6px 10px;
+    cursor: pointer;
+    text-transform: uppercase;
+  }
+  button:hover { border-color: #aa9a60; color: #aa9a60; }
+  button.primary { background: #2a2418; color: #c8b880; }
+  button.active { background: #3a3420; border-color: #c8b880; color: #c8b880; }
+  .row { display: flex; gap: 4px; flex-wrap: wrap; }
+  #wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0a0908;
+    position: relative;
+  }
+  canvas { image-rendering: pixelated; cursor: crosshair; }
+  #status { color: #5a4a38; font-size: 9px; min-height: 28px; line-height: 1.4; }
+  .sep { border-top: 1px solid #2a2418; margin: 4px 0; }
+</style>
+</head>
+<body>
+
+<div id="panel">
+  <div style="color:#c8b880; font-size:12px; letter-spacing:2px;">LIFE</div>
+
+  <div class="cg">
+    <label>Grid</label>
+    <select id="gridSize">
+      <option value="128">128×128</option>
+      <option value="256" selected>256×256</option>
+      <option value="512">512×512</option>
+      <option value="1024">1024×1024</option>
+    </select>
+  </div>
+
+  <div class="cg">
+    <label>Speed (ms/step)</label>
+    <input type="range" id="speed" min="0" max="500" value="50" step="10">
+    <div class="v" id="speedVal">50</div>
+  </div>
+
+  <div class="cg">
+    <label>Initial Fill %</label>
+    <input type="range" id="fillPct" min="1" max="80" value="25" step="1">
+    <div class="v" id="fillPctVal">25</div>
+  </div>
+
+  <div class="cg">
+    <label>Palette</label>
+    <select id="palette">
+      <option value="white">White on black</option>
+      <option value="green">Green phosphor</option>
+      <option value="amber" selected>Amber</option>
+      <option value="cream">Cream/Brown</option>
+      <option value="blue">Blue</option>
+      <option value="heat">Heat (age)</option>
+    </select>
+  </div>
+
+  <div class="cg">
+    <label>Trails</label>
+    <select id="trails">
+      <option value="none">None</option>
+      <option value="fade" selected>Fade</option>
+      <option value="accumulate">Accumulate</option>
+    </select>
+  </div>
+
+  <div class="sep"></div>
+
+  <div class="row">
+    <button class="primary" id="playPause">Play</button>
+    <button id="step">Step</button>
+    <button id="clear">Clear</button>
+  </div>
+
+  <div class="row">
+    <button id="randomize">Randomize</button>
+    <button id="save">Save</button>
+  </div>
+
+  <div class="sep"></div>
+  <label style="color:#6a5a40;">Presets</label>
+  <div class="row">
+    <button class="preset" data-p="glider">Glider</button>
+    <button class="preset" data-p="lwss">LWSS</button>
+    <button class="preset" data-p="rpentomino">R-pentomino</button>
+  </div>
+  <div class="row">
+    <button class="preset" data-p="acorn">Acorn</button>
+    <button class="preset" data-p="gosper">Gosper Gun</button>
+    <button class="preset" data-p="pulsar">Pulsar</button>
+  </div>
+  <div class="row">
+    <button class="preset" data-p="diehard">Diehard</button>
+    <button class="preset" data-p="infinite1">Infinite 1</button>
+  </div>
+
+  <div class="sep"></div>
+
+  <div class="cg">
+    <label>Seed #</label>
+    <input type="range" id="rngSeed" min="1" max="9999" value="42" step="1">
+    <div class="v" id="rngSeedVal">42</div>
+  </div>
+
+  <div id="status">Gen: 0 | Pop: 0</div>
+</div>
+
+<div id="wrap">
+  <canvas id="c"></canvas>
+</div>
+
+<script>
+function mulberry32(a) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    var t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  }
+}
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+let N = 256;
+let grid, nextGrid, ageGrid, trailGrid;
+let generation = 0;
+let running = false;
+let timer = null;
+
+function initGrids() {
+  grid = new Uint8Array(N * N);
+  nextGrid = new Uint8Array(N * N);
+  ageGrid = new Uint16Array(N * N);
+  trailGrid = new Float32Array(N * N);
+  generation = 0;
+}
+
+function setCell(x, y, v) {
+  if (x >= 0 && x < N && y >= 0 && y < N) {
+    grid[y * N + x] = v ? 1 : 0;
+    if (v) ageGrid[y * N + x] = 1;
+  }
+}
+
+function getCell(x, y) {
+  if (x < 0) x += N;
+  if (x >= N) x -= N;
+  if (y < 0) y += N;
+  if (y >= N) y -= N;
+  return grid[y * N + x];
+}
+
+function step() {
+  let pop = 0;
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      const neighbors =
+        getCell(x-1,y-1) + getCell(x,y-1) + getCell(x+1,y-1) +
+        getCell(x-1,y)   +                   getCell(x+1,y) +
+        getCell(x-1,y+1) + getCell(x,y+1) + getCell(x+1,y+1);
+
+      const idx = y * N + x;
+      const alive = grid[idx];
+
+      if (alive) {
+        nextGrid[idx] = (neighbors === 2 || neighbors === 3) ? 1 : 0;
+      } else {
+        nextGrid[idx] = (neighbors === 3) ? 1 : 0;
+      }
+
+      if (nextGrid[idx]) {
+        pop++;
+        ageGrid[idx] = alive ? ageGrid[idx] + 1 : 1;
+        trailGrid[idx] = 1;
+      } else {
+        ageGrid[idx] = 0;
+      }
+    }
+  }
+
+  // Swap
+  const tmp = grid;
+  grid = nextGrid;
+  nextGrid = tmp;
+  generation++;
+  return pop;
+}
+
+// Palettes
+function getColor(alive, age, trail, palette) {
+  if (palette === 'heat') {
+    if (alive) {
+      const t = Math.min(1, age / 200);
+      // young = bright yellow, old = deep red
+      const r = Math.floor(255);
+      const g = Math.floor(255 * (1 - t * 0.8));
+      const b = Math.floor(60 * (1 - t));
+      return [r, g, b];
+    }
+    if (trail > 0.05) {
+      return [Math.floor(40 * trail), Math.floor(10 * trail), Math.floor(5 * trail)];
+    }
+    return [0, 0, 0];
+  }
+
+  const colors = {
+    white:  { alive: [255,255,255], trail: (t) => [Math.floor(50*t), Math.floor(50*t), Math.floor(50*t)], bg: [0,0,0] },
+    green:  { alive: [50,255,80],   trail: (t) => [Math.floor(10*t), Math.floor(60*t), Math.floor(15*t)], bg: [0,0,0] },
+    amber:  { alive: [250,190,50],  trail: (t) => [Math.floor(60*t), Math.floor(35*t), Math.floor(5*t)],  bg: [10,9,8] },
+    cream:  { alive: [240,234,214], trail: (t) => [Math.floor(50*t), Math.floor(40*t), Math.floor(25*t)], bg: [15,13,10] },
+    blue:   { alive: [80,160,255],  trail: (t) => [Math.floor(10*t), Math.floor(20*t), Math.floor(60*t)], bg: [0,0,0] },
+  };
+
+  const p = colors[palette] || colors.amber;
+  if (alive) return p.alive;
+  if (trail > 0.05) return p.trail(trail);
+  return p.bg;
+}
+
+function render() {
+  canvas.width = N;
+  canvas.height = N;
+  const trailMode = document.getElementById('trails').value;
+  const palette = document.getElementById('palette').value;
+  const imgData = ctx.createImageData(N, N);
+  const data = imgData.data;
+  let pop = 0;
+
+  for (let i = 0; i < N * N; i++) {
+    const alive = grid[i];
+    if (alive) pop++;
+
+    // Trail decay
+    if (trailMode === 'fade') {
+      if (!alive) trailGrid[i] *= 0.92;
+    } else if (trailMode === 'accumulate') {
+      // Don't decay, just accumulate
+      if (!alive && trailGrid[i] > 0) trailGrid[i] = Math.min(1, trailGrid[i]);
+    } else {
+      if (!alive) trailGrid[i] = 0;
+    }
+
+    const [r, g, b] = getColor(alive, ageGrid[i], trailGrid[i], palette);
+    const pi = i * 4;
+    data[pi] = r;
+    data[pi+1] = g;
+    data[pi+2] = b;
+    data[pi+3] = 255;
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+  document.getElementById('status').textContent = `Gen: ${generation} | Pop: ${pop}`;
+}
+
+// Presets
+const PRESETS = {
+  glider: [[1,0],[2,1],[0,2],[1,2],[2,2]],
+  lwss: [[1,0],[4,0],[0,1],[0,2],[4,2],[0,3],[1,3],[2,3],[3,3]],
+  rpentomino: [[1,0],[2,0],[0,1],[1,1],[1,2]],
+  acorn: [[1,0],[3,1],[0,2],[1,2],[4,2],[5,2],[6,2]],
+  diehard: [[6,0],[0,1],[1,1],[1,2],[5,2],[6,2],[7,2]],
+  pulsar: (() => {
+    const pts = [];
+    const rows = [
+      [2,3,4,8,9,10],  // y=0
+      [0,5,7,12],       // y=2
+      [0,5,7,12],       // y=3
+      [0,5,7,12],       // y=4
+      [2,3,4,8,9,10],  // y=5
+    ];
+    const yoffs = [0,2,3,4,5,7,8,9,10,12];
+    // Just encode the full pulsar
+    const p = [
+      [2,0],[3,0],[4,0],[8,0],[9,0],[10,0],
+      [0,2],[5,2],[7,2],[12,2],
+      [0,3],[5,3],[7,3],[12,3],
+      [0,4],[5,4],[7,4],[12,4],
+      [2,5],[3,5],[4,5],[8,5],[9,5],[10,5],
+      [2,7],[3,7],[4,7],[8,7],[9,7],[10,7],
+      [0,8],[5,8],[7,8],[12,8],
+      [0,9],[5,9],[7,9],[12,9],
+      [0,10],[5,10],[7,10],[12,10],
+      [2,12],[3,12],[4,12],[8,12],[9,12],[10,12],
+    ];
+    return p;
+  })(),
+  gosper: [
+    [24,0],
+    [22,1],[24,1],
+    [12,2],[13,2],[20,2],[21,2],[34,2],[35,2],
+    [11,3],[15,3],[20,3],[21,3],[34,3],[35,3],
+    [0,4],[1,4],[10,4],[16,4],[20,4],[21,4],
+    [0,5],[1,5],[10,5],[14,5],[16,5],[17,5],[22,5],[24,5],
+    [10,6],[16,6],[24,6],
+    [11,7],[15,7],
+    [12,8],[13,8],
+  ],
+  infinite1: [[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],
+    [9,0],[10,0],[11,0],[12,0],[13,0],
+    [17,0],[18,0],[19,0],
+    [26,0],[27,0],[28,0],[29,0],[30,0],[31,0],[32,0],
+    [34,0],[35,0],[36,0],[37,0],[38,0]],
+};
+
+function placePreset(name) {
+  const pts = PRESETS[name];
+  if (!pts) return;
+  const cx = Math.floor(N / 2);
+  const cy = Math.floor(N / 2);
+  // Find center of pattern
+  let mx = 0, my = 0;
+  for (const [x,y] of pts) { mx += x; my += y; }
+  mx = Math.floor(mx / pts.length);
+  my = Math.floor(my / pts.length);
+
+  for (const [x, y] of pts) {
+    setCell(cx + x - mx, cy + y - my, 1);
+  }
+}
+
+function randomize() {
+  const rng = mulberry32(+document.getElementById('rngSeed').value);
+  const fillPct = +document.getElementById('fillPct').value / 100;
+  for (let i = 0; i < N * N; i++) {
+    grid[i] = rng() < fillPct ? 1 : 0;
+    ageGrid[i] = grid[i] ? 1 : 0;
+    trailGrid[i] = grid[i] ? 1 : 0;
+  }
+  generation = 0;
+}
+
+// Drawing
+let drawing = false;
+let drawVal = 1;
+
+function canvasPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = N / rect.width;
+  const scaleY = N / rect.height;
+  return {
+    x: Math.floor((e.clientX - rect.left) * scaleX),
+    y: Math.floor((e.clientY - rect.top) * scaleY),
+  };
+}
+
+canvas.addEventListener('mousedown', (e) => {
+  drawing = true;
+  const {x, y} = canvasPos(e);
+  drawVal = grid[y * N + x] ? 0 : 1; // toggle
+  setCell(x, y, drawVal);
+  if (!running) render();
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  if (!drawing) return;
+  const {x, y} = canvasPos(e);
+  setCell(x, y, drawVal);
+  // Also fill a small radius for easier drawing
+  setCell(x+1, y, drawVal);
+  setCell(x, y+1, drawVal);
+  setCell(x+1, y+1, drawVal);
+  if (!running) render();
+});
+
+canvas.addEventListener('mouseup', () => { drawing = false; });
+canvas.addEventListener('mouseleave', () => { drawing = false; });
+
+// Controls
+function toggleRun() {
+  running = !running;
+  document.getElementById('playPause').textContent = running ? 'Pause' : 'Play';
+  document.getElementById('playPause').classList.toggle('active', running);
+  if (running) tick();
+}
+
+function tick() {
+  if (!running) return;
+  step();
+  render();
+  const speed = +document.getElementById('speed').value;
+  if (speed === 0) requestAnimationFrame(tick);
+  else setTimeout(tick, speed);
+}
+
+document.getElementById('playPause').addEventListener('click', toggleRun);
+
+document.getElementById('step').addEventListener('click', () => {
+  step();
+  render();
+});
+
+document.getElementById('clear').addEventListener('click', () => {
+  running = false;
+  document.getElementById('playPause').textContent = 'Play';
+  document.getElementById('playPause').classList.remove('active');
+  initGrids();
+  render();
+});
+
+document.getElementById('randomize').addEventListener('click', () => {
+  initGrids();
+  randomize();
+  render();
+});
+
+document.getElementById('gridSize').addEventListener('change', () => {
+  N = +document.getElementById('gridSize').value;
+  running = false;
+  document.getElementById('playPause').textContent = 'Play';
+  document.getElementById('playPause').classList.remove('active');
+  initGrids();
+  render();
+});
+
+document.querySelectorAll('.preset').forEach(btn => {
+  btn.addEventListener('click', () => {
+    initGrids();
+    placePreset(btn.dataset.p);
+    render();
+  });
+});
+
+['speed','fillPct','rngSeed'].forEach(id => {
+  const el = document.getElementById(id);
+  const val = document.getElementById(id + 'Val');
+  el.addEventListener('input', () => { val.textContent = el.value; });
+});
+
+document.getElementById('save').addEventListener('click', () => {
+  const link = document.createElement('a');
+  link.download = 'life.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+});
+
+// Resize canvas display to fit
+function fitCanvas() {
+  const wrap = document.getElementById('wrap');
+  const size = Math.min(wrap.clientWidth - 32, wrap.clientHeight - 32);
+  canvas.style.width = size + 'px';
+  canvas.style.height = size + 'px';
+}
+window.addEventListener('resize', fitCanvas);
+
+// Init
+initGrids();
+randomize();
+render();
+fitCanvas();
+</script>
+</body>
+</html>

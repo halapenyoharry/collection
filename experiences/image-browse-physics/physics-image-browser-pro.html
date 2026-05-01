@@ -1,0 +1,1260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Physics Image Browser PRO - Invisible Controls Edition</title>
+    <script src="../_vendor/d3.v7.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a1a;
+            overflow-x: hidden;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+        }
+
+        #container {
+            width: 100vw;
+            min-height: 100vh;
+            position: relative;
+        }
+
+        #drop-zone {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 400px;
+            height: 200px;
+            border: 3px dashed rgba(255,255,255,0.4);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: rgba(255,255,255,0.8);
+            font-size: 18px;
+            text-align: center;
+            transition: all 0.3s ease;
+            z-index: 10;
+            backdrop-filter: blur(5px);
+            background: rgba(0,0,0,0.3);
+        }
+
+        #drop-zone.dragover {
+            border-color: #00ff88;
+            background: rgba(0, 255, 136, 0.15);
+            color: #00ff88;
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.3);
+        }
+
+        #drop-zone.hidden {
+            display: none;
+        }
+
+        svg {
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+        }
+
+        svg:active {
+            cursor: grabbing;
+        }
+
+        .image-node {
+            cursor: move;
+        }
+
+        .image-node:hover .image-square {
+            filter: brightness(1.1) drop-shadow(0 0 8px rgba(0, 255, 136, 0.4));
+        }
+
+        .image-node.dragging .image-square {
+            filter: brightness(1.2) drop-shadow(0 0 20px rgba(255, 215, 0, 0.8));
+        }
+
+        .image-square {
+            stroke: none;
+            filter: drop-shadow(0 0 0px transparent);
+            rx: var(--corner-radius, 4);
+            transition: filter 0.2s ease;
+        }
+
+        .resize-handle {
+            fill: rgba(255, 255, 255, 0.8);
+            stroke: rgba(0, 0, 0, 0.5);
+            stroke-width: 1;
+            cursor: nw-resize;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .image-node:hover .resize-handle {
+            opacity: 1;
+        }
+
+        .resize-handle:hover {
+            fill: rgba(0, 255, 136, 0.9);
+            stroke: rgba(0, 0, 0, 0.8);
+        }
+
+        #controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        #image-count {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            backdrop-filter: blur(10px);
+        }
+
+        button {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            backdrop-filter: blur(10px);
+            transition: all 0.2s ease;
+        }
+
+        button:hover {
+            background: rgba(0, 255, 136, 0.2);
+            border-color: rgba(0, 255, 136, 0.5);
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        #density-warning {
+            position: fixed;
+            top: 100px;
+            right: 20px;
+            background: rgba(255, 140, 0, 0.9);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 1000;
+            display: none;
+            border: 2px solid rgba(255, 165, 0, 0.8);
+        }
+
+        /* INVISIBLE CONTROL PANEL */
+        #invisible-panel {
+            position: fixed;
+            top: 50px;
+            left: 50px;
+            width: 350px;
+            background: rgba(0, 0, 0, 0.95);
+            border: 2px solid rgba(0, 255, 136, 0.8);
+            border-radius: 12px;
+            color: white;
+            padding: 20px;
+            z-index: 2000;
+            backdrop-filter: blur(15px);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+            display: none;
+            font-size: 14px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        #invisible-panel h3 {
+            margin: 0 0 15px 0;
+            color: #00ff88;
+            font-size: 16px;
+            border-bottom: 1px solid rgba(0, 255, 136, 0.3);
+            padding-bottom: 8px;
+        }
+
+        .control-section {
+            margin-bottom: 20px;
+        }
+
+        .control-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .control-row label {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 13px;
+        }
+
+        .control-row input[type="range"] {
+            width: 150px;
+            margin-left: 10px;
+        }
+
+        .control-row input[type="checkbox"] {
+            margin-left: 10px;
+        }
+
+        .control-row select {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-left: 10px;
+        }
+
+        .action-button {
+            background: rgba(0, 255, 136, 0.2);
+            border: 1px solid rgba(0, 255, 136, 0.5);
+            color: #00ff88;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin: 2px;
+            transition: all 0.2s ease;
+        }
+
+        .action-button:hover {
+            background: rgba(0, 255, 136, 0.4);
+        }
+
+        .shortcut-hint {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: rgba(255, 255, 255, 0.6);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .shortcut-hint.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="drop-zone">
+            Drop images for ULTIMATE physics browsing<br>
+            <small>Press Shift+T for advanced controls ⚡</small>
+        </div>
+        
+        <div id="controls">
+            <div id="image-count">0 squares</div>
+            <button onclick="resetPositions()">Reset</button>
+            <button onclick="clearImages()">Clear</button>
+        </div>
+
+        <div id="density-warning">
+            ⚠️ Large collection detected! Performance may decrease with 500+ images.
+        </div>
+
+        <!-- INVISIBLE CONTROL PANEL -->
+        <div id="invisible-panel">
+            <h3>⚡ Physics Control Panel</h3>
+            
+            <div class="control-section">
+                <h4 style="color: #00ff88; margin: 0 0 10px 0;">Physics Settings</h4>
+                
+                <div class="control-row">
+                    <label>Collision Strength:</label>
+                    <input type="range" id="collision-strength" min="0.1" max="1.0" step="0.1" value="0.8">
+                    <span id="collision-value">0.8</span>
+                </div>
+                
+                <div class="control-row">
+                    <label>Overlap Tolerance:</label>
+                    <input type="range" id="overlap-tolerance" min="0" max="20" step="1" value="2">
+                    <span id="overlap-value">2px</span>
+                </div>
+                
+                <div class="control-row">
+                    <label>Damping (Stability):</label>
+                    <input type="range" id="damping" min="0.1" max="0.9" step="0.05" value="0.7">
+                    <span id="damping-value">0.7</span>
+                </div>
+                
+                <div class="control-row">
+                    <button class="action-button" onclick="fillGaps()">🔧 Fill Gaps</button>
+                    <button class="action-button" onclick="compactLayout()">📦 Compact</button>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h4 style="color: #00ff88; margin: 0 0 10px 0;">Visual Settings</h4>
+                
+                <div class="control-row">
+                    <label>Show Borders:</label>
+                    <input type="checkbox" id="show-borders" checked>
+                </div>
+                
+                <div class="control-row">
+                    <label>Border Width:</label>
+                    <input type="range" id="border-width" min="0" max="5" step="1" value="1">
+                    <span id="border-width-value">1px</span>
+                </div>
+                
+                <div class="control-row">
+                    <label>Corner Radius:</label>
+                    <input type="range" id="corner-radius" min="0" max="20" step="1" value="4">
+                    <span id="corner-radius-value">4px</span>
+                </div>
+                
+                <div class="control-row">
+                    <label>Thumbnail Quality:</label>
+                    <select id="thumbnail-quality">
+                        <option value="0.7">Fast (70%)</option>
+                        <option value="0.85">Good (85%)</option>
+                        <option value="0.92" selected>High (92%)</option>
+                        <option value="0.98">Ultra (98%)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h4 style="color: #00ff88; margin: 0 0 10px 0;">Organization</h4>
+                
+                <div class="control-row">
+                    <label>Sort By:</label>
+                    <select id="sort-method">
+                        <option value="none">Natural Physics</option>
+                        <option value="name">Name (A-Z)</option>
+                        <option value="date-modified">Date Modified</option>
+                        <option value="date-created">Date Created</option>
+                        <option value="size">File Size</option>
+                        <option value="random">Shuffle</option>
+                    </select>
+                </div>
+                
+                <div class="control-row">
+                    <button class="action-button" onclick="applySorting()">🔄 Apply Sort</button>
+                    <button class="action-button" onclick="resetToGrid()">📊 Grid Layout</button>
+                </div>
+                
+                <div class="control-row">
+                    <button class="action-button" onclick="exportLayout()">💾 Export Layout</button>
+                    <button class="action-button" onclick="importLayout()">📂 Import Layout</button>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h4 style="color: #00ff88; margin: 0 0 10px 0;">Performance</h4>
+                
+                <div class="control-row">
+                    <label>Max Images:</label>
+                    <input type="range" id="max-images" min="50" max="2000" step="50" value="500">
+                    <span id="max-images-value">500</span>
+                </div>
+                
+                <div class="control-row">
+                    <button class="action-button" onclick="optimizePerformance()">⚡ Optimize</button>
+                    <button class="action-button" onclick="showStats()">📊 Stats</button>
+                </div>
+            </div>
+
+            <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.2);">
+                <div style="font-size: 12px; color: rgba(255,255,255,0.6);">
+                    Press <strong>Shift+T</strong> to toggle this panel<br>
+                    Press <strong>G</strong> to fill gaps quickly<br>
+                    Press <strong>R</strong> to reset layout
+                </div>
+            </div>
+        </div>
+
+        <div class="shortcut-hint" id="shortcut-hint">
+            💡 Shift+T for control panel • G to fill gaps • R to reset
+        </div>
+
+        <input type="file" id="file-input" multiple accept="image/*" webkitdirectory>
+        <input type="file" id="image-input" multiple accept="image/*">
+        
+        <svg id="physics-canvas"></svg>
+    </div>
+
+    <script>
+        // Enhanced physics with configurable parameters
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+        let canvasHeight = height;
+        let images = [];
+        let simulation;
+        let draggedNode = null;
+        let resizeMode = false;
+        let resizingNode = null;
+        
+        // Configurable physics parameters
+        let config = {
+            collisionStrength: 0.8,
+            overlapTolerance: 2,
+            damping: 0.1,
+            showBorders: false,
+            borderWidth: 1,
+            cornerRadius: 4,
+            thumbnailQuality: 0.92,
+            sortMethod: 'none',
+            maxImages: 500
+        };
+        
+        const svg = d3.select('#physics-canvas');
+        const container = svg.append('g');
+        
+        // Resize tracking variables
+        let initialResizeDistance = 0;
+        let initialResizeSize = 0;
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (event) => {
+            if (event.shiftKey && event.key.toLowerCase() === 't') {
+                toggleControlPanel();
+                event.preventDefault();
+            } else if (event.key.toLowerCase() === 'g' && !event.ctrlKey && !event.metaKey) {
+                fillGaps();
+                event.preventDefault();
+            } else if (event.key.toLowerCase() === 'r' && !event.ctrlKey && !event.metaKey) {
+                resetPositions();
+                event.preventDefault();
+            } else if (event.key === 'Escape') {
+                hideControlPanel();
+            }
+        });
+
+        // Show shortcut hint on first load
+        setTimeout(() => {
+            document.getElementById('shortcut-hint').classList.add('show');
+            setTimeout(() => {
+                document.getElementById('shortcut-hint').classList.remove('show');
+            }, 4000);
+        }, 2000);
+
+        function toggleControlPanel() {
+            const panel = document.getElementById('invisible-panel');
+            if (panel.style.display === 'none' || !panel.style.display) {
+                panel.style.display = 'block';
+                updateControlValues();
+            } else {
+                panel.style.display = 'none';
+            }
+        }
+
+        function hideControlPanel() {
+            document.getElementById('invisible-panel').style.display = 'none';
+        }
+
+        function updateControlValues() {
+            document.getElementById('collision-strength').value = config.collisionStrength;
+            document.getElementById('collision-value').textContent = config.collisionStrength;
+            document.getElementById('overlap-tolerance').value = config.overlapTolerance;
+            document.getElementById('overlap-value').textContent = config.overlapTolerance + 'px';
+            document.getElementById('damping').value = config.damping;
+            document.getElementById('damping-value').textContent = config.damping;
+            document.getElementById('show-borders').checked = config.showBorders;
+            document.getElementById('border-width').value = config.borderWidth;
+            document.getElementById('border-width-value').textContent = config.borderWidth + 'px';
+            document.getElementById('corner-radius').value = config.cornerRadius;
+            document.getElementById('corner-radius-value').textContent = config.cornerRadius + 'px';
+            document.getElementById('thumbnail-quality').value = config.thumbnailQuality;
+            document.getElementById('sort-method').value = config.sortMethod;
+            document.getElementById('max-images').value = config.maxImages;
+            document.getElementById('max-images-value').textContent = config.maxImages;
+        }
+
+        // Control panel event listeners
+        document.getElementById('collision-strength').addEventListener('input', (e) => {
+            config.collisionStrength = parseFloat(e.target.value);
+            document.getElementById('collision-value').textContent = config.collisionStrength;
+            if (simulation) {
+                simulation.force('collide', perfectCollisionForce());
+                simulation.alpha(0.3).restart();
+            }
+        });
+
+        document.getElementById('overlap-tolerance').addEventListener('input', (e) => {
+            config.overlapTolerance = parseInt(e.target.value);
+            document.getElementById('overlap-value').textContent = config.overlapTolerance + 'px';
+            if (simulation) {
+                simulation.force('collide', perfectCollisionForce());
+                simulation.alpha(0.3).restart();
+            }
+        });
+
+        document.getElementById('damping').addEventListener('input', (e) => {
+            config.damping = parseFloat(e.target.value);
+            document.getElementById('damping-value').textContent = config.damping;
+            if (simulation) {
+                simulation.velocityDecay(config.damping);
+            }
+        });
+
+        document.getElementById('show-borders').addEventListener('change', (e) => {
+            config.showBorders = e.target.checked;
+            updateVisualStyles();
+        });
+
+        document.getElementById('border-width').addEventListener('input', (e) => {
+            config.borderWidth = parseInt(e.target.value);
+            document.getElementById('border-width-value').textContent = config.borderWidth + 'px';
+            updateVisualStyles();
+        });
+
+        document.getElementById('corner-radius').addEventListener('input', (e) => {
+            config.cornerRadius = parseInt(e.target.value);
+            document.getElementById('corner-radius-value').textContent = config.cornerRadius + 'px';
+            updateVisualStyles();
+        });
+
+        document.getElementById('thumbnail-quality').addEventListener('change', (e) => {
+            config.thumbnailQuality = parseFloat(e.target.value);
+        });
+
+        document.getElementById('sort-method').addEventListener('change', (e) => {
+            config.sortMethod = e.target.value;
+        });
+
+        document.getElementById('max-images').addEventListener('input', (e) => {
+            config.maxImages = parseInt(e.target.value);
+            document.getElementById('max-images-value').textContent = config.maxImages;
+        });
+
+        function updateVisualStyles() {
+            const root = document.documentElement;
+            root.style.setProperty('--corner-radius', config.cornerRadius + 'px');
+            
+            // Update existing images with drop-shadow based on border setting
+            container.selectAll('.image-square')
+                .attr('rx', config.cornerRadius)
+                .style('filter', config.showBorders ? 
+                    `drop-shadow(0 0 ${config.borderWidth * 2}px rgba(255,255,255,0.3))` : 
+                    'drop-shadow(0 0 0px transparent)');
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            svg.attr('width', width);
+            
+            updateCanvasHeight();
+            
+            if (simulation) {
+                simulation.force('boundary', boundaryForce());
+                simulation.alpha(0.1).restart();
+            }
+        });
+
+        // Update canvas height - only expand down, strong top boundary
+        function updateCanvasHeight() {
+            if (images.length === 0) {
+                canvasHeight = height;
+                svg.attr('height', canvasHeight);
+                return;
+            }
+            
+            const maxY = d3.max(images, d => d.y + d.size / 2) || height;
+            canvasHeight = Math.max(height, maxY + 100);
+            svg.attr('height', canvasHeight);
+        }
+
+        // Enhanced boundary force
+        function boundaryForce() {
+            return function(alpha) {
+                images.forEach(d => {
+                    const padding = 5;
+                    const radius = d.size / 2;
+                    
+                    if (d.x - radius < padding) {
+                        d.x = padding + radius;
+                        d.vx = Math.abs(d.vx) * 0.3;
+                    }
+                    if (d.x + radius > width - padding) {
+                        d.x = width - padding - radius;
+                        d.vx = -Math.abs(d.vx) * 0.3;
+                    }
+                    
+                    if (d.y - radius < 30) {
+                        d.y = 30 + radius;
+                        d.vy = Math.abs(d.vy) * 0.8;
+                    }
+                    
+                    if (d.y + radius > canvasHeight - 50) {
+                        updateCanvasHeight();
+                    }
+                });
+            };
+        }
+
+        // Enhanced collision force with config parameters
+        function perfectCollisionForce() {
+            const density = images.length / (width * height / 10000);
+            const strength = Math.min(1.0, config.collisionStrength + density * 0.2);
+            const iterations = density > 0.5 ? 4 : 3;
+            
+            return d3.forceCollide()
+                .radius(d => d.size / 2 + config.overlapTolerance)
+                .strength(strength)
+                .iterations(iterations);
+        }
+
+        // Enhanced size calculation with max limit
+        function calculateOptimalSize(imageCount) {
+            if (imageCount > config.maxImages) {
+                alert(`Too many images! Limiting to ${config.maxImages} for optimal performance.`);
+                return 45; // Small size for large batches
+            }
+            
+            if (imageCount > 500) {
+                document.getElementById('density-warning').style.display = 'block';
+                setTimeout(() => {
+                    document.getElementById('density-warning').style.display = 'none';
+                }, 4000);
+            }
+            
+            const viewportArea = width * height * 0.8;
+            const areaPerImage = viewportArea / Math.min(imageCount, config.maxImages);
+            let sideLength = Math.sqrt(areaPerImage);
+            
+            let optimalSize;
+            if (imageCount <= 20) optimalSize = Math.min(200, sideLength);
+            else if (imageCount <= 100) optimalSize = Math.min(150, sideLength);
+            else if (imageCount <= 300) optimalSize = Math.min(120, sideLength);
+            else if (imageCount <= 600) optimalSize = Math.min(100, sideLength);
+            else if (imageCount <= 1000) optimalSize = Math.min(80, sideLength);
+            else if (imageCount <= 2000) optimalSize = Math.min(60, sideLength);
+            else optimalSize = Math.min(45, sideLength);
+            
+            return Math.max(30, optimalSize);
+        }
+
+        // Enhanced thumbnail generation with quality setting
+        function generateSquareThumbnail(img, size) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = size;
+            canvas.height = size;
+            
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            
+            const sourceSize = Math.min(img.naturalWidth, img.naturalHeight);
+            const sourceX = (img.naturalWidth - sourceSize) / 2;
+            const sourceY = (img.naturalHeight - sourceSize) / 2;
+            
+            ctx.drawImage(img, sourceX, sourceY, sourceSize, sourceSize, 0, 0, size, size);
+            
+            return canvas.toDataURL('image/jpeg', config.thumbnailQuality);
+        }
+
+        // Enhanced image loading with sorting capability
+        async function loadImages(files) {
+            document.getElementById('drop-zone').classList.add('hidden');
+            
+            let imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
+            
+            // Apply max image limit
+            if (imageFiles.length > config.maxImages) {
+                imageFiles = imageFiles.slice(0, config.maxImages);
+            }
+            
+            const optimalSize = calculateOptimalSize(imageFiles.length);
+            
+            console.log(`Loading ${imageFiles.length} squares at ${optimalSize}px each`);
+            
+            images = [];
+            let loadedCount = 0;
+            
+            const progressDiv = document.createElement('div');
+            progressDiv.style.cssText = `
+                position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+                background: rgba(0,0,0,0.9); color: white; padding: 20px; border-radius: 8px;
+                font-size: 16px; z-index: 1000; text-align: center;
+                border: 2px solid rgba(0, 255, 136, 0.5);
+            `;
+            document.body.appendChild(progressDiv);
+            
+            for (let index = 0; index < imageFiles.length; index++) {
+                const file = imageFiles[index];
+                
+                try {
+                    const img = new Image();
+                    const url = URL.createObjectURL(file);
+                    
+                    await new Promise((resolve, reject) => {
+                        img.onload = resolve;
+                        img.onerror = reject;
+                        img.src = url;
+                    });
+                    
+                    const thumbnailURL = generateSquareThumbnail(img, optimalSize);
+                    URL.revokeObjectURL(url);
+                    
+                    // Organized grid starting positions
+                    const rowHeight = optimalSize + 15;
+                    const imagesPerRow = Math.floor((width - 20) / (optimalSize + 15));
+                    const row = Math.floor(index / imagesPerRow);
+                    const col = index % imagesPerRow;
+                    
+                    const startX = 20 + (col + 0.5) * ((width - 40) / imagesPerRow);
+                    const startY = 50 + (row + 0.5) * rowHeight;
+                    
+                    images.push({
+                        id: index,
+                        thumbnailURL: thumbnailURL,
+                        size: optimalSize,
+                        x: startX + (Math.random() - 0.5) * 10,
+                        y: startY + (Math.random() - 0.5) * 10,
+                        originalFile: file,
+                        fullSizeURL: null,
+                        dateModified: file.lastModified,
+                        dateCreated: file.lastModified, // Approximation
+                        fileSize: file.size,
+                        name: file.name
+                    });
+                    
+                } catch (error) {
+                    console.log(`Failed to process ${file.name}:`, error);
+                }
+                
+                loadedCount++;
+                progressDiv.textContent = `Processing: ${loadedCount}/${imageFiles.length}`;
+            }
+            
+            document.body.removeChild(progressDiv);
+            document.getElementById('image-count').textContent = `${images.length} squares`;
+            
+            // Apply sorting if specified
+            if (config.sortMethod !== 'none') {
+                applySorting();
+            }
+            
+            renderSquares();
+            updateCanvasHeight();
+            initSimulation();
+        }
+
+        // Initialize enhanced simulation
+        function initSimulation() {
+            simulation = d3.forceSimulation(images)
+                .force('collide', perfectCollisionForce())
+                .force('boundary', boundaryForce())
+                .velocityDecay(config.damping)
+                .alphaDecay(0.02)
+                .on('tick', ticked)
+                .on('end', () => updateCanvasHeight());
+        }
+
+        function ticked() {
+            container.selectAll('g.image-node')
+                .attr('transform', d => `translate(${d.x},${d.y})`);
+        }
+
+        // Enhanced rendering with configurable styles
+        function renderSquares() {
+            const nodes = container.selectAll('g.image-node')
+                .data(images, d => d.id);
+            
+            const nodeEnter = nodes.enter()
+                .append('g')
+                .attr('class', 'image-node')
+                .call(d3.drag()
+                    .on('start', dragStarted)
+                    .on('drag', dragged)
+                    .on('end', dragEnded));
+            
+            nodeEnter.append('defs')
+                .append('clipPath')
+                .attr('id', d => `clip-${d.id}`)
+                .append('rect')
+                .attr('x', d => -d.size / 2)
+                .attr('y', d => -d.size / 2)
+                .attr('width', d => d.size)
+                .attr('height', d => d.size)
+                .attr('rx', config.cornerRadius);
+            
+            const imageGroup = nodeEnter.append('g')
+                .attr('class', 'image-container');
+            
+            // Enhanced rendering with configurable styles
+            imageGroup.append('rect')
+                .attr('class', 'image-square')
+                .attr('x', d => -d.size / 2)
+                .attr('y', d => -d.size / 2)
+                .attr('width', d => d.size)
+                .attr('height', d => d.size)
+                .attr('rx', config.cornerRadius)
+                .attr('fill', 'transparent')
+                .attr('stroke', 'none'); // No stroke, using drop-shadow instead
+            
+            imageGroup.append('image')
+                .attr('href', d => d.thumbnailURL)
+                .attr('x', d => -d.size / 2)
+                .attr('y', d => -d.size / 2)
+                .attr('width', d => d.size)
+                .attr('height', d => d.size)
+                .attr('clip-path', d => `url(#clip-${d.id})`)
+                .style('cursor', 'pointer')
+                .on('click', showDetailView);
+            
+            const handlePositions = [
+                {x: 1, y: -1, cursor: 'ne-resize'},
+                {x: 1, y: 1, cursor: 'se-resize'},
+                {x: -1, y: 1, cursor: 'sw-resize'},
+                {x: -1, y: -1, cursor: 'nw-resize'}
+            ];
+            
+            handlePositions.forEach((pos) => {
+                imageGroup.append('circle')
+                    .attr('class', 'resize-handle')
+                    .attr('cx', d => pos.x * d.size / 2)
+                    .attr('cy', d => pos.y * d.size / 2)
+                    .attr('r', 6)
+                    .style('cursor', pos.cursor)
+                    .call(d3.drag()
+                        .on('start', (event, d) => resizeStarted(event, d, pos))
+                        .on('drag', (event, d) => resizeDragged(event, d, pos))
+                        .on('end', resizeEnded));
+            });
+            
+            nodes.exit().remove();
+        }
+
+        // PERFECT DRAG BEHAVIOR
+        function dragStarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.1).restart();
+            draggedNode = d;
+            d.fx = d.x;
+            d.fy = d.y;
+            d3.select(this).classed('dragging', true);
+        }
+
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+            updateCanvasHeight();
+        }
+
+        function dragEnded(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            draggedNode = null;
+            d.fx = null;
+            d.fy = null;
+            d3.select(this).classed('dragging', false);
+            setTimeout(() => updateCanvasHeight(), 500);
+        }
+
+        // FIXED RESIZE BEHAVIOR
+        function resizeStarted(event, d, handle) {
+            event.sourceEvent.stopPropagation();
+            resizeMode = true;
+            resizingNode = d;
+            d.fx = d.x;
+            d.fy = d.y;
+            
+            const dx = event.x - d.x;
+            const dy = event.y - d.y;
+            initialResizeDistance = Math.sqrt(dx * dx + dy * dy);
+            initialResizeSize = d.size;
+        }
+
+        function resizeDragged(event, d, handle) {
+            const dx = event.x - d.x;
+            const dy = event.y - d.y;
+            const currentDistance = Math.sqrt(dx * dx + dy * dy);
+            
+            const distanceChange = currentDistance - initialResizeDistance;
+            const newSize = Math.max(25, Math.min(500, initialResizeSize + (distanceChange * 2)));
+            
+            if (Math.abs(newSize - d.size) > 2) {
+                d.size = newSize;
+                
+                if (d.originalFile) {
+                    const img = new Image();
+                    img.onload = function() {
+                        const newThumbnailURL = generateSquareThumbnail(img, newSize);
+                        const node = container.selectAll('g.image-node').filter(nd => nd.id === d.id);
+                        node.select('image').attr('href', newThumbnailURL);
+                        if (d.thumbnailURL) URL.revokeObjectURL(d.thumbnailURL);
+                        d.thumbnailURL = newThumbnailURL;
+                    };
+                    img.src = d.fullSizeURL || URL.createObjectURL(d.originalFile);
+                }
+                
+                const node = container.selectAll('g.image-node').filter(nd => nd.id === d.id);
+                
+                node.select('clipPath rect')
+                    .attr('x', -newSize / 2)
+                    .attr('y', -newSize / 2)
+                    .attr('width', newSize)
+                    .attr('height', newSize);
+                
+                node.select('.image-square')
+                    .attr('x', -newSize / 2)
+                    .attr('y', -newSize / 2)
+                    .attr('width', newSize)
+                    .attr('height', newSize);
+                
+                node.select('image')
+                    .attr('x', -newSize / 2)
+                    .attr('y', -newSize / 2)
+                    .attr('width', newSize)
+                    .attr('height', newSize);
+                
+                node.selectAll('.resize-handle')
+                    .attr('cx', (_, i) => {
+                        const positions = [{x: 1, y: -1}, {x: 1, y: 1}, {x: -1, y: 1}, {x: -1, y: -1}];
+                        return positions[i].x * newSize / 2;
+                    })
+                    .attr('cy', (_, i) => {
+                        const positions = [{x: 1, y: -1}, {x: 1, y: 1}, {x: -1, y: 1}, {x: -1, y: -1}];
+                        return positions[i].y * newSize / 2;
+                    });
+                
+                if (simulation) {
+                    simulation.force('collide', perfectCollisionForce());
+                    simulation.alpha(0.3).restart();
+                }
+            }
+        }
+
+        function resizeEnded(event, d) {
+            resizeMode = false;
+            resizingNode = null;
+            d.fx = null;
+            d.fy = null;
+            initialResizeDistance = 0;
+            initialResizeSize = 0;
+        }
+
+        // Detail view
+        async function showDetailView(event, d) {
+            event.stopPropagation();
+            
+            if (!d.fullSizeURL) {
+                d.fullSizeURL = URL.createObjectURL(d.originalFile);
+            }
+            
+            const modal = d3.select('body').append('div')
+                .style('position', 'fixed')
+                .style('top', '0')
+                .style('left', '0')
+                .style('width', '100%')
+                .style('height', '100%')
+                .style('background', 'rgba(0,0,0,0.95)')
+                .style('z-index', '2000')
+                .style('display', 'flex')
+                .style('align-items', 'center')
+                .style('justify-content', 'center')
+                .style('cursor', 'pointer')
+                .on('click', function() { modal.remove(); });
+            
+            modal.append('img')
+                .attr('src', d.fullSizeURL)
+                .style('max-width', '90%')
+                .style('max-height', '90%')
+                .style('border-radius', '8px')
+                .style('box-shadow', '0 0 50px rgba(0, 255, 136, 0.3)');
+            
+            modal.append('div')
+                .style('position', 'absolute')
+                .style('bottom', '30px')
+                .style('color', 'white')
+                .style('font-size', '16px')
+                .style('background', 'rgba(0,0,0,0.8)')
+                .style('padding', '12px 20px')
+                .style('border-radius', '8px')
+                .html(`
+                    <strong>${d.originalFile.name}</strong><br>
+                    <small>Size: ${(d.fileSize / 1024).toFixed(1)} KB • Modified: ${new Date(d.dateModified).toLocaleDateString()}</small>
+                `);
+        }
+
+        // ENHANCED CONTROL FUNCTIONS
+        
+        function fillGaps() {
+            if (!simulation) return;
+            
+            // Add a temporary gentle pull toward center to fill gaps
+            simulation.force('gap-fill', d3.forceX(width / 2).strength(0.02));
+            simulation.force('gap-fill-y', d3.forceY(height / 3).strength(0.01));
+            simulation.alpha(0.5).restart();
+            
+            // Remove gap-filling forces after a delay
+            setTimeout(() => {
+                simulation.force('gap-fill', null);
+                simulation.force('gap-fill-y', null);
+            }, 2000);
+        }
+
+        function compactLayout() {
+            if (!simulation) return;
+            
+            // Increase collision strength temporarily for tighter packing
+            const originalStrength = config.collisionStrength;
+            config.collisionStrength = 0.9;
+            
+            simulation.force('collide', perfectCollisionForce());
+            simulation.alpha(0.6).restart();
+            
+            // Restore original strength
+            setTimeout(() => {
+                config.collisionStrength = originalStrength;
+                simulation.force('collide', perfectCollisionForce());
+                updateControlValues();
+            }, 3000);
+        }
+
+        function applySorting() {
+            if (images.length === 0 || config.sortMethod === 'none') return;
+            
+            let sortedImages = [...images];
+            
+            switch (config.sortMethod) {
+                case 'name':
+                    sortedImages.sort((a, b) => a.name.localeCompare(b.name));
+                    break;
+                case 'date-modified':
+                    sortedImages.sort((a, b) => b.dateModified - a.dateModified);
+                    break;
+                case 'date-created':
+                    sortedImages.sort((a, b) => b.dateCreated - a.dateCreated);
+                    break;
+                case 'size':
+                    sortedImages.sort((a, b) => b.fileSize - a.fileSize);
+                    break;
+                case 'random':
+                    sortedImages = d3.shuffle(sortedImages);
+                    break;
+            }
+            
+            // Reposition based on sort order
+            const rowHeight = 80;
+            const imagesPerRow = Math.floor((width - 20) / 80);
+            
+            sortedImages.forEach((d, index) => {
+                const row = Math.floor(index / imagesPerRow);
+                const col = index % imagesPerRow;
+                
+                d.x = 50 + (col * 80) + (Math.random() - 0.5) * 20;
+                d.y = 50 + (row * rowHeight) + (Math.random() - 0.5) * 20;
+                d.fx = null;
+                d.fy = null;
+            });
+            
+            if (simulation) simulation.alpha(0.5).restart();
+        }
+
+        function resetToGrid() {
+            resetPositions();
+        }
+
+        function exportLayout() {
+            const layoutData = {
+                config: config,
+                positions: images.map(d => ({
+                    id: d.id,
+                    x: d.x,
+                    y: d.y,
+                    size: d.size,
+                    name: d.name
+                }))
+            };
+            
+            const dataStr = JSON.stringify(layoutData, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            const url = URL.createObjectURL(dataBlob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'physics-layout.json';
+            link.click();
+            
+            URL.revokeObjectURL(url);
+        }
+
+        function importLayout() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        try {
+                            const layoutData = JSON.parse(event.target.result);
+                            
+                            // Apply configuration
+                            if (layoutData.config) {
+                                config = {...config, ...layoutData.config};
+                                updateControlValues();
+                                updateVisualStyles();
+                            }
+                            
+                            // Apply positions if images match
+                            if (layoutData.positions && images.length > 0) {
+                                layoutData.positions.forEach(pos => {
+                                    const image = images.find(img => img.name === pos.name);
+                                    if (image) {
+                                        image.x = pos.x;
+                                        image.y = pos.y;
+                                        if (pos.size) image.size = pos.size;
+                                    }
+                                });
+                                
+                                if (simulation) simulation.alpha(0.3).restart();
+                            }
+                        } catch (error) {
+                            alert('Invalid layout file');
+                        }
+                    };
+                    reader.readAsText(file);
+                }
+            };
+            input.click();
+        }
+
+        function optimizePerformance() {
+            // Reduce physics iterations for better performance
+            config.collisionStrength = Math.max(0.5, config.collisionStrength - 0.2);
+            config.damping = Math.min(0.9, config.damping + 0.1);
+            
+            if (simulation) {
+                simulation.force('collide', perfectCollisionForce());
+                simulation.velocityDecay(config.damping);
+            }
+            
+            updateControlValues();
+            alert('Performance optimized! Reduced collision strength and increased damping.');
+        }
+
+        function showStats() {
+            const stats = {
+                totalImages: images.length,
+                averageSize: d3.mean(images, d => d.size).toFixed(1),
+                canvasSize: `${width} × ${canvasHeight}`,
+                memoryUsage: (images.length * 0.1).toFixed(1) + ' MB (estimated)',
+                simulationActive: simulation ? !simulation.alpha() <= simulation.alphaMin() : false
+            };
+            
+            alert(`📊 Physics Browser Stats:
+• Images: ${stats.totalImages}
+• Average Size: ${stats.averageSize}px
+• Canvas: ${stats.canvasSize}
+• Memory: ~${stats.memoryUsage}
+• Simulation: ${stats.simulationActive ? 'Active' : 'Settled'}`);
+        }
+
+        // Utility functions
+        function resetPositions() {
+            // Use EXACT SAME logic as initial load for perfect grid
+            if (images.length === 0) return;
+            
+            const sampleSize = images[0].size; // Use actual image size
+            const rowHeight = sampleSize + 15;
+            const imagesPerRow = Math.floor((width - 20) / (sampleSize + 15));
+            
+            images.forEach((d, index) => {
+                const row = Math.floor(index / imagesPerRow);
+                const col = index % imagesPerRow;
+                
+                // EXACT same positioning as loadImages()
+                const startX = 20 + (col + 0.5) * ((width - 40) / imagesPerRow);
+                const startY = 50 + (row + 0.5) * rowHeight;
+                
+                d.x = startX + (Math.random() - 0.5) * 10; // Same random offset as initial load
+                d.y = startY + (Math.random() - 0.5) * 10;
+                d.fx = null;
+                d.fy = null;
+            });
+            
+            updateCanvasHeight();
+            if (simulation) simulation.alpha(0.3).restart();
+        }
+
+        function clearImages() {
+            images.forEach(d => {
+                URL.revokeObjectURL(d.thumbnailURL);
+                if (d.fullSizeURL) URL.revokeObjectURL(d.fullSizeURL);
+            });
+            images = [];
+            draggedNode = null;
+            resizingNode = null;
+            container.selectAll('g').remove();
+            document.getElementById('drop-zone').classList.remove('hidden');
+            document.getElementById('image-count').textContent = '0 squares';
+            if (simulation) simulation.stop();
+            canvasHeight = height;
+            svg.attr('height', canvasHeight);
+        }
+
+        // File handling
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const imageInput = document.getElementById('image-input');
+
+        dropZone.addEventListener('click', () => {
+            if (confirm('Load folder of images? (OK = folder, Cancel = individual files)')) {
+                fileInput.click();
+            } else {
+                imageInput.click();
+            }
+        });
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                loadImages(files);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                loadImages(e.target.files);
+            }
+        });
+
+        imageInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                loadImages(e.target.files);
+            }
+        });
+
+        // Initialize
+        svg.attr('width', width).attr('height', height);
+        canvasHeight = height;
+    </script>
+</body>
+</html>

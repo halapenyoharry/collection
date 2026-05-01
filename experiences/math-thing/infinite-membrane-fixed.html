@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>2D Wave Equation - Membrane Dynamics</title>
+    <style>
+        body { margin: 0; background: #000; overflow: hidden; font-family: 'Courier New', monospace; }
+        canvas { display: block; }
+        #controls {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-family: monospace;
+            font-size: 14px;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 15px;
+            border-radius: 5px;
+            max-width: 400px;
+            max-height: calc(100vh - 20px);
+            overflow-y: auto;
+            transition: opacity 0.3s ease;
+            z-index: 999;
+        }
+        #controls.hidden {
+            display: none; /* Completely hide, not slide */
+        }
+        #hamburger {
+            position: fixed; /* Always fixed position */
+            top: 10px;
+            left: 10px;
+            width: 30px;
+            height: 30px;
+            background: rgba(60, 60, 60, 0.2); /* Very subtle dark */
+            border: 1px solid rgba(100, 100, 100, 0.2);
+            border-radius: 3px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 3px;
+            z-index: 1001; /* Above controls */
+            transition: all 0.3s ease;
+        }
+        #hamburger:hover {
+            background: rgba(80, 80, 80, 0.4);
+        }
+        #hamburger span {
+            width: 20px;
+            height: 2px;
+            background: rgba(180, 180, 180, 0.4); /* Slightly more visible bars */
+            transition: background 0.3s ease;
+        }
+        #hamburger:hover span {
+            background: rgba(220, 220, 220, 0.8);
+        }
+        .control-group {
+            margin: 10px 0;
+        }
+        .control-section {
+            border-top: 1px solid #444;
+            margin-top: 15px;
+            padding-top: 10px;
+        }
+        label {
+            display: block;
+            margin-bottom: 3px;
+            color: #aaa;
+            font-size: 12px;
+        }
+        .equation {
+            background: rgba(20, 20, 40, 0.8);
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            color: #0ff;
+            text-align: center;
+            font-size: 24px;
+            line-height: 1.5;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+        .equation:hover {
+            background: rgba(30, 30, 60, 0.9);
+        }
+        .equation-param {
+            color: #ffff00;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+        .equation-param:hover {
+            color: #ffffff;
+        }
+        .equation-label {
+            color: #888;
+            font-size: 14px; /* Keep label smaller */
+            margin-bottom: 5px;
+        }
+        button {
+            margin: 5px;
+            padding: 5px 10px;
+            background: #222;
+            color: #ddd;
+            border: 1px solid #444;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #333;
+            border-color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <strong>2D Wave Equation - Membrane Dynamics</strong>
+        <div style="font-size: 10px; color: #666; margin-top: 3px;">Click membrane to strike • Press 'H' to hide/show</div>
+        
+        <div style="margin: 10px 0;">
+            <button id="reset" style="width: 100%; padding: 8px; background: #333; color: white; border: 1px solid #555; cursor: pointer;">
+                Reset All Settings to Default
+            </button>
+        </div>
+        
+        <div class="equation">
+            <div class="equation-label">Governing Equation (click parameters to adjust):</div>
+            <div id="equation">
+                ∂²u/∂t² = <span class="equation-param" data-control="tension" title="Click to adjust wave velocity">c²</span>∇²u - <span class="equation-param" data-control="damping" title="Click to adjust damping">γ</span>(∂u/∂t)<br>
+                c² = <span id="eq-c2" class="equation-param" data-control="tension">0.04</span>, γ = <span id="eq-gamma" class="equation-param" data-control="damping">0.002</span>
+            </div>
+        </div>
+        
+        <div class="control-section">
+            <strong>Colors & Appearance</strong>
+            <div style="font-size: 10px; color: #666;">Visual styling and color scheme</div>
+            
+            <div class="control-group">
+                <label title="Primary color of the wave membrane surface">Wave Color (Main Theme)</label>
+                <input type="color" id="waveColor" value="#ffffff">
+            </div>
+            
+            <div class="control-group">
+                <label title="Color of the scene background">Background Color</label>
+                <input type="color" id="bgColor" value="#000000">
+            </div>
+            
+            <div class="control-group">
+                <label title="Color of the impedance boundary visualization">Impedance Boundary Color</label>
+                <input type="color" id="boundaryColor" value="#00ffff">
+            </div>
+            
+            <div class="control-group">
+                <label title="Base opacity when membrane is flat (0=invisible, 1=opaque)">Membrane Base Opacity</label>
+                <input type="range" id="baseOpacity" min="0" max="1" value="0" step="0.05">
+                <span id="baseOpacityValue">0.00</span>
+            </div>
+            
+            <div class="control-group">
+                <label title="Multiplier for wave visibility (higher = more visible waves)">Wave Opacity Multiplier</label>
+                <input type="range" id="waveOpacity" min="0.1" max="2" value="1" step="0.1">
+                <span id="waveOpacityValue">1.0</span>
+            </div>
+            
+            <div class="control-group">
+                <label title="Amplification factor for wave height display">Vertical Wave Scale</label>
+                <input type="range" id="waveHeight" min="5" max="50" value="15" step="1">
+                <span id="waveHeightValue">15</span>
+            </div>
+            
+            <div class="control-group">
+                <label title="Show the impedance boundary region as colored overlay">Show Impedance Boundary</label>
+                <input type="checkbox" id="showBoundary">
+            </div>
+        </div>
+        
+        <div class="control-section">
+            <strong>Physics Parameters</strong>
+            <div style="font-size: 10px; color: #666;">Physical properties governing wave behavior</div>
+            
+            <div class="control-group">
+                <label title="Energy dissipation rate - lower values = less damping">Damping Coefficient (γ)</label>
+                <input type="range" id="damping" min="0.98" max="1.0" value="0.998" step="0.0001">
+                <span id="dampValue">0.998</span>
+            </div>
+            
+            <div class="control-group">
+                <label title="Wave propagation speed = √(tension/density)">Wave Velocity (c)</label>
+                <input type="range" id="tension" min="0.05" max="0.5" value="0.2" step="0.01">
+                <span id="tensionValue">0.20</span>
+            </div>
+            
+            <div class="control-group">
+                <label title="Width of absorption region at boundaries">Impedance Boundary Width</label>
+                <input type="range" id="fadeZone" min="5" max="80" value="40" step="5">
+                <span id="fadeZoneValue">40</span>
+            </div>
+            
+            <div class="control-group">
+                <label title="0=perfect absorption, 1=perfect reflection">Reflection Coefficient (R)</label>
+                <input type="range" id="reflection" min="0" max="1" value="0.1" step="0.05">
+                <span id="reflectionValue">0.10</span>
+            </div>
+            
+            <div class="control-group">
+                <label title="Exponential power for boundary absorption curve">Boundary Absorption Power</label>
+                <input type="range" id="absorptionPower" min="1" max="5" value="3" step="0.5">
+                <span id="absorptionPowerValue">3.0</span>
+            </div>
+            
+            <div class="control-group">
+                <label title="Shape of the boundary condition">Boundary Geometry</label>
+                <select id="boundaryShape">
+                    <option value="square">Square (Rectangular)</option>
+                    <option value="circle">Circular (Radial)</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label title="Numerical method for Laplacian calculation">Laplacian Stencil (∇²)</label>
+                <select id="laplacianType">
+                    <option value="4point">4-point (faster)</option>
+                    <option value="8point">8-point (more accurate)</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="control-section">
+            <strong>Membrane Dimensions</strong>
+            <div style="font-size: 10px; color: #666;">Size and scale of the membrane</div>
+            
+            <div class="control-group">
+                <label title="Physical size of the membrane (affects viewing area)">Membrane Size</label>
+                <input type="range" id="membraneSize" min="200" max="800" value="300" step="50">
+                <span id="membraneSizeValue">300</span>
+            </div>
+            
+            <div class="control-group">
+                <label title="Resolution of physics simulation (higher = more detail)">Grid Resolution</label>
+                <input type="range" id="gridResolution" min="100" max="300" value="200" step="20">
+                <span id="gridResolutionValue">200</span>
+            </div>
+        </div>
+        
+        <div class="control-section">
+            <strong>Strike & Interaction</strong>
+            <div style="font-size: 10px; color: #666;">Force applied when clicking membrane</div>
+            
+            <div class="control-group">
+                <label title="Mass of the striker (affects momentum transfer)">Impulse Magnitude (p = mv)</label>
+                <input type="range" id="mass" min="1" max="50" value="10" step="1">
+                <span id="massValue">10</span>
+            </div>
+            
+            <div class="control-group">
+                <label title="Velocity of impact">Impact Velocity (v)</label>
+                <input type="range" id="velocity" min="0.5" max="5" value="2" step="0.1">
+                <span id="velocityValue">2.0</span>
+            </div>
+            
+            <div class="control-group">
+                <label title="Size of contact area (Gaussian spread)">Strike Radius (σ)</label>
+                <input type="range" id="strikeRadius" min="1" max="10" value="4" step="1">
+                <span id="strikeRadiusValue">4</span>
+            </div>
+            
+            <div class="control-group">
+                <label title="Efficiency of momentum transfer to membrane">Impulse Transfer Coefficient</label>
+                <input type="range" id="impulseCoeff" min="0.01" max="0.2" value="0.05" step="0.01">
+                <span id="impulseCoeffValue">0.05</span>
+            </div>
+            
+            <button id="strike">Apply Center Impulse</button>
+            <button id="resetWaves">Reset Waves Only</button>
+        </div>
+        
+        <div class="control-section">
+            <strong>Material & Effects</strong>
+            <div style="font-size: 10px; color: #666;">Surface properties and atmospheric effects</div>
+            
+            <div class="control-group">
+                <label title="Reflectivity of the membrane surface">Specular Intensity</label>
+                <input type="range" id="specularIntensity" min="0" max="1" value="0.4" step="0.05">
+                <span id="specularValue">0.40</span>
+            </div>
+            
+            <div class="control-group">
+                <label title="Sharpness of reflections (higher = more mirror-like)">Shininess</label>
+                <input type="range" id="shininess" min="0" max="200" value="100" step="10">
+                <span id="shininessValue">100</span>
+            </div>
+            
+            <div class="control-group">
+                <label title="Distance where fog starts to obscure objects">Fog Start Distance</label>
+                <input type="range" id="fogNear" min="50" max="200" value="100" step="10">
+                <span id="fogNearValue">100</span>
+            </div>
+            
+            <div class="control-group">
+                <label title="Distance where fog completely obscures objects">Fog End Distance</label>
+                <input type="range" id="fogFar" min="150" max="500" value="300" step="10">
+                <span id="fogFarValue">300</span>
+            </div>
+        </div>
+        
+        <div class="control-section">
+            <strong>Lighting Setup</strong>
+            <div style="font-size: 10px; color: #666;">3D scene illumination with multiple light sources</div>
+            
+            <div class="control-group">
+                <label title="Overall ambient illumination (fills shadows)">Ambient Light</label>
+                <input type="range" id="ambientIntensity" min="0" max="1" value="0.4" step="0.05">
+                <span id="ambientValue">0.40</span>
+            </div>
+            
+            <div class="control-group">
+                <label title="Main directional light intensity (like sunlight)">Primary Light</label>
+                <input type="range" id="directionalIntensity" min="0" max="2" value="0.8" step="0.1">
+                <span id="directionalValue">0.80</span>
+            </div>
+            
+            <div class="control-group">
+                <label title="X position of primary light direction">Light Direction X</label>
+                <input type="range" id="lightDirX" min="-100" max="100" value="50" step="5">
+                <span id="lightDirXValue">50</span>
+            </div>
+            
+            <div class="control-group">
+                <label title="Y position of primary light direction (height)">Light Direction Y</label>
+                <input type="range" id="lightDirY" min="0" max="200" value="100" step="5">
+                <span id="lightDirYValue">100</span>
+            </div>
+            
+            <div class="control-group">
+                <label title="Z position of primary light direction">Light Direction Z</label>
+                <input type="range" id="lightDirZ" min="-100" max="100" value="50" step="5">
+                <span id="lightDirZValue">50</span>
+            </div>
+            
+            <div class="control-group">
+                <label title="Light that follows camera for close-up viewing">Camera Light</label>
+                <input type="range" id="cameraLightIntensity" min="0" max="1" value="0.3" step="0.05">
+                <span id="cameraLightValue">0.30</span>
+            </div>
+            
+            <div class="control-group">
+                <label title="Color tint of secondary directional light">Secondary Light Color</label>
+                <input type="color" id="secondaryLightColor" value="#4488ff">
+            </div>
+        </div>
+    </div>
+    
+    <div id="hamburger">
+        <span></span>
+        <span></span>
+        <span></span>
+    </div>
+    
+    <script src="../_vendor/three.r128.min.js"></script>
+    <script src="../_vendor/three-OrbitControls.r128.js"></script>
+    <script>
+        // Scene setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x000000);
+        // Fog only at far distances to not interfere with close viewing
+        scene.fog = new THREE.Fog(0x000000, 100, 300);
+        
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(40, 30, 40); // Lower angle to see waves edge-on
+        camera.lookAt(0, 0, 0);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+        
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        
+        // Enhanced lighting that works at all distances - all adjustable
+        const ambientLight = new THREE.AmbientLight(0xffffff); 
+        ambientLight.intensity = 0.4; // Start at 0.4
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff);
+        directionalLight.intensity = 0.8;
+        directionalLight.position.set(50, 100, 50);
+        scene.add(directionalLight);
+        
+        const directionalLight2 = new THREE.DirectionalLight(0x4488ff);
+        directionalLight2.intensity = 0.4;
+        directionalLight2.position.set(-50, 80, -50);
+        scene.add(directionalLight2);
+        
+        // Point light that moves with camera for close-up viewing
+        const cameraLight = new THREE.PointLight(0xffffff);
+        cameraLight.intensity = 0.3;
+        cameraLight.distance = 200;
+        scene.add(cameraLight);
+        
+        // Make membrane HUGE - much bigger than what camera can see
+        const gridSize = 200;
+        const membraneSize = 300; // Way bigger than view
+        const geometry = new THREE.PlaneGeometry(membraneSize, membraneSize, gridSize, gridSize);
+        
+        // Enhanced 3D material - properly visible from all angles
+        const material = new THREE.MeshPhongMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.0,  // Start invisible
+            wireframe: false,
+            side: THREE.DoubleSide,
+            shininess: 100,
+            specular: 0x444444,
+            emissive: 0x222222, // Slightly brighter emissive
+            flatShading: false,
+            depthWrite: false, // Changed for transparent rendering
+            depthTest: true
+        });
+        
+        // Custom shader for boundary visualization only
+        const boundaryMaterial = new THREE.ShaderMaterial({
+            uniforms: {
+                waveColor: { value: new THREE.Color(1.0, 1.0, 1.0) },
+                showBoundary: { value: 0.0 },
+                fadeZoneRatio: { value: 40.0 / 200.0 },
+                boundaryShape: { value: 0.0 } // 0=square, 1=circle
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform vec3 waveColor;
+                uniform float showBoundary;
+                uniform float fadeZoneRatio;
+                uniform float boundaryShape;
+                varying vec2 vUv;
+                
+                void main() {
+                    float opacity = 0.0;
+                    
+                    // Show the impedance boundary
+                    if (showBoundary > 0.5) {
+                        float distFromEdge;
+                        
+                        if (boundaryShape > 0.5) {
+                            // Circular boundary
+                            vec2 center = vec2(0.5, 0.5);
+                            float radius = 0.5;
+                            float radialDist = distance(vUv, center);
+                            distFromEdge = radius - radialDist;
+                        } else {
+                            // Square boundary
+                            distFromEdge = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
+                        }
+                        
+                        // Show where impedance boundary starts
+                        if (abs(distFromEdge - fadeZoneRatio) < 0.003) {
+                            opacity = 0.3; // Visible boundary line
+                        }
+                        // Faintly show the impedance zone
+                        else if (distFromEdge < fadeZoneRatio) {
+                            opacity = 0.05; // Faint absorption zone
+                        }
+                    }
+                    
+                    if (opacity < 0.001) {
+                        discard;
+                    }
+                    
+                    gl_FragColor = vec4(waveColor, opacity);
+                }
+            `,
+            transparent: true,
+            depthWrite: false
+        });
+        
+        const membrane = new THREE.Mesh(geometry, material);
+        membrane.rotation.x = -Math.PI / 2;
+        scene.add(membrane);
+        
+        // Add boundary overlay mesh
+        const boundaryGeometry = new THREE.PlaneGeometry(membraneSize, membraneSize, 2, 2);
+        const boundaryMesh = new THREE.Mesh(boundaryGeometry, boundaryMaterial);
+        boundaryMesh.rotation.x = -Math.PI / 2;
+        boundaryMesh.position.y = 0.1; // Slightly above membrane
+        scene.add(boundaryMesh);
+        
+        // Grid removed - no more dingy green square
+        // const gridHelper = new THREE.GridHelper(100, 50, 0x666666, 0x444444);
+        // gridHelper.position.y = -0.1;
+        // scene.add(gridHelper);
+        
+        // Wave simulation arrays - properly initialized as 2D arrays
+        let heights = new Array(gridSize + 1);
+        let velocities = new Array(gridSize + 1);
+        for (let i = 0; i <= gridSize; i++) {
+            heights[i] = new Array(gridSize + 1).fill(0);
+            velocities[i] = new Array(gridSize + 1).fill(0);
+        }
+        
+        // Physics parameters
+        let waveSpeed = 0.2;  // c = sqrt(T/ρ)
+        let damping = 0.998;   // γ damping coefficient
+        let strikerMass = 10;  // mass for impulse
+        let strikerVelocity = 2; // velocity for impulse
+        let fadeZone = 40; // Impedance boundary width
+        let waveHeightAmp = 15.0; // Vertical scale for visibility
+        let reflectionCoeff = 0.1; // R: 0=absorbing, 1=perfect reflection
+        let boundaryShape = 'square'; // square or circle
+        let baseOpacity = 0.0; // Base membrane opacity - invisible until waves!
+        let waveOpacityMult = 1.0; // Wave visibility multiplier
+        let strikeRadius = 4; // Gaussian strike radius
+        let impulseCoeff = 0.05; // Impulse transfer coefficient
+        let laplacianType = '4point'; // Laplacian calculation method
+        let absorptionPower = 3; // Power for boundary absorption curve
+        
+        // Strike the membrane - apply impulse p = mv
+        function strikeMembrane(x, y, mass, velocity) {
+            // Convert world coordinates to grid indices
+            const gridX = Math.round((x / membraneSize + 0.5) * gridSize);
+            const gridY = Math.round((y / membraneSize + 0.5) * gridSize);
+            
+            // Make sure we're well within bounds (not near edges)
+            if (gridX < 50 || gridX > gridSize - 50 || gridY < 50 || gridY > gridSize - 50) {
+                // Too close to edge, move strike to center area
+                strikeMembrane(0, 0, mass, velocity);
+                return;
+            }
+            
+            // Impulse p = mv (momentum transfer)
+            const impulse = mass * velocity;
+            
+            // Apply gaussian distribution of force (models striker contact area)
+            for (let i = -strikeRadius; i <= strikeRadius; i++) {
+                for (let j = -strikeRadius; j <= strikeRadius; j++) {
+                    const gi = gridX + i;
+                    const gj = gridY + j;
+                    
+                    if (gi >= 0 && gi <= gridSize && gj >= 0 && gj <= gridSize) {
+                        const dist2 = i * i + j * j;
+                        const sigma2 = strikeRadius; // Variance based on radius
+                        const gaussian = Math.exp(-dist2 / (2 * sigma2));
+                        // Convert impulse to velocity change Δv = p/m_effective
+                        velocities[gi][gj] += impulse * gaussian * impulseCoeff;
+                    }
+                }
+            }
+        }
+        
+        // Update wave equation: ∂²u/∂t² = c²∇²u - γ∂u/∂t
+        // where u is displacement, c is wave velocity, γ is damping
+        function updateWave() {
+            const newHeights = new Array(gridSize + 1).fill(0).map(() => new Array(gridSize + 1).fill(0));
+            
+            // Apply 2D wave equation with damping - interior points only
+            for (let i = 1; i < gridSize; i++) {
+                for (let j = 1; j < gridSize; j++) {
+                    let laplacian;
+                    
+                    if (laplacianType === '8point' && i > 1 && i < gridSize - 1 && j > 1 && j < gridSize - 1) {
+                        // 8-point stencil (includes diagonals) - more accurate but needs more boundary space
+                        const cardinal = heights[i + 1][j] + heights[i - 1][j] + 
+                                       heights[i][j + 1] + heights[i][j - 1] - 
+                                       4 * heights[i][j];
+                        const diagonal = 0.25 * (heights[i + 1][j + 1] + heights[i - 1][j + 1] + 
+                                                heights[i + 1][j - 1] + heights[i - 1][j - 1] - 
+                                                4 * heights[i][j]);
+                        laplacian = cardinal + diagonal;
+                    } else {
+                        // 4-point stencil (standard) - faster and works at boundaries
+                        laplacian = (heights[i + 1][j] + heights[i - 1][j] + 
+                                   heights[i][j + 1] + heights[i][j - 1] - 
+                                   4 * heights[i][j]);
+                    }
+                    
+                    // Wave equation with damping: a = c²∇²u - γv
+                    velocities[i][j] += waveSpeed * waveSpeed * laplacian;
+                    velocities[i][j] *= damping; // Apply damping coefficient
+                    newHeights[i][j] = heights[i][j] + velocities[i][j];
+                }
+            }
+            
+            // Impedance boundary conditions with reflection coefficient
+            for (let i = 0; i <= gridSize; i++) {
+                for (let j = 0; j <= gridSize; j++) {
+                    let distFromEdge;
+                    
+                    if (boundaryShape === 'circle') {
+                        // Radial distance from center
+                        const cx = gridSize / 2;
+                        const cy = gridSize / 2;
+                        const radius = gridSize / 2;
+                        const radialDist = Math.sqrt((i - cx) * (i - cx) + (j - cy) * (j - cy));
+                        distFromEdge = radius - radialDist;
+                    } else {
+                        // Square boundary (distance to nearest edge)
+                        distFromEdge = Math.min(i, gridSize - i, j, gridSize - j);
+                    }
+                    
+                    if (distFromEdge < fadeZone) {
+                        // Impedance matching with partial reflection
+                        const ratio = distFromEdge / fadeZone;
+                        // Transmission coefficient T = 1 - R
+                        const transmission = 1 - reflectionCoeff;
+                        // Exponential absorption in boundary layer with adjustable power
+                        const absorption = transmission * (1 - Math.pow(ratio, absorptionPower));
+                        const boundaryDamping = 1 - absorption;
+                        
+                        newHeights[i][j] *= boundaryDamping;
+                        velocities[i][j] *= boundaryDamping * (0.9 + reflectionCoeff * 0.1);
+                    }
+                }
+            }
+            
+            // Copy new heights
+            for (let i = 0; i <= gridSize; i++) {
+                for (let j = 0; j <= gridSize; j++) {
+                    heights[i][j] = newHeights[i][j];
+                }
+            }
+            
+            // Update mesh geometry with amplified wave heights
+            const positions = membrane.geometry.attributes.position.array;
+            let maxDisplacement = 0;
+            
+            for (let i = 0; i <= gridSize; i++) {
+                for (let j = 0; j <= gridSize; j++) {
+                    const index = (i * (gridSize + 1) + j) * 3 + 2; // z component
+                    const displacement = heights[j][i] * waveHeightAmp;
+                    positions[index] = displacement; // Apply amplification!
+                    maxDisplacement = Math.max(maxDisplacement, Math.abs(displacement));
+                }
+            }
+            
+            // Always ensure some visibility when there are waves
+            if (maxDisplacement > 0.01) {
+                // Dynamic opacity based on wave activity
+                const waveActivity = Math.min(maxDisplacement / 2, 1.0); // Very sensitive
+                const targetOpacity = 0.5 + waveActivity * waveOpacityMult * 0.5;
+                material.opacity = Math.min(targetOpacity, 1.0); // Cap at 1.0
+                material.depthWrite = material.opacity > 0.5; // Enable depth write for more opaque
+            } else {
+                // No waves - use base opacity
+                material.opacity = baseOpacity;
+                material.depthWrite = false;
+            }
+            
+            membrane.geometry.attributes.position.needsUpdate = true;
+            membrane.geometry.computeVertexNormals(); // Important for proper lighting!
+        }
+        
+        // Mouse interaction
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        
+        renderer.domElement.addEventListener('click', (event) => {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObject(membrane);
+            
+            if (intersects.length > 0) {
+                const point = intersects[0].point;
+                strikeMembrane(point.x, point.z, strikerMass, strikerVelocity);
+            }
+        });
+        
+        // UI controls
+        document.getElementById('strike').addEventListener('click', () => {
+            strikeMembrane(0, 0, strikerMass, strikerVelocity);
+        });
+        
+        document.getElementById('resetWaves').addEventListener('click', () => {
+            // Reset waves only
+            for (let i = 0; i <= gridSize; i++) {
+                heights[i] = new Array(gridSize + 1).fill(0);
+                velocities[i] = new Array(gridSize + 1).fill(0);
+            }
+        });
+        
+        document.getElementById('reset').addEventListener('click', () => {
+            // Reset EVERYTHING to defaults
+            // Physics
+            waveSpeed = 0.2;
+            damping = 0.998;
+            strikerMass = 10;
+            strikerVelocity = 2;
+            fadeZone = 40;
+            reflectionCoeff = 0.1;
+            waveHeightAmp = 15;
+            boundaryShape = 'square';
+            baseOpacity = 0.0;
+            waveOpacityMult = 1.0;
+            strikeRadius = 4;
+            impulseCoeff = 0.05;
+            laplacianType = '4point';
+            absorptionPower = 3;
+            
+            // Update all controls
+            document.getElementById('damping').value = damping;
+            document.getElementById('dampValue').textContent = damping.toFixed(4);
+            document.getElementById('tension').value = waveSpeed;
+            document.getElementById('tensionValue').textContent = waveSpeed.toFixed(2);
+            document.getElementById('mass').value = strikerMass;
+            document.getElementById('massValue').textContent = strikerMass;
+            document.getElementById('velocity').value = strikerVelocity;
+            document.getElementById('velocityValue').textContent = strikerVelocity.toFixed(1);
+            document.getElementById('strikeRadius').value = strikeRadius;
+            document.getElementById('strikeRadiusValue').textContent = strikeRadius;
+            document.getElementById('impulseCoeff').value = impulseCoeff;
+            document.getElementById('impulseCoeffValue').textContent = impulseCoeff.toFixed(3);
+            document.getElementById('fadeZone').value = fadeZone;
+            document.getElementById('fadeZoneValue').textContent = fadeZone;
+            document.getElementById('reflection').value = reflectionCoeff;
+            document.getElementById('reflectionValue').textContent = reflectionCoeff.toFixed(2);
+            document.getElementById('waveHeight').value = waveHeightAmp;
+            document.getElementById('waveHeightValue').textContent = waveHeightAmp;
+            document.getElementById('baseOpacity').value = baseOpacity;
+            document.getElementById('baseOpacityValue').textContent = '0.00';
+            document.getElementById('waveOpacity').value = waveOpacityMult;
+            document.getElementById('waveOpacityValue').textContent = waveOpacityMult.toFixed(1);
+            document.getElementById('boundaryShape').value = boundaryShape;
+            document.getElementById('laplacianType').value = laplacianType;
+            document.getElementById('showBoundary').checked = false;
+            document.getElementById('showReflection').checked = false;
+            
+            // Reset lighting and directions
+            ambientLight.intensity = 0.4;
+            directionalLight.intensity = 0.8;
+            directionalLight.position.set(50, 100, 50);
+            directionalLight2.intensity = 0.4;
+            directionalLight2.color = new THREE.Color(0x4488ff);
+            cameraLight.intensity = 0.3;
+            
+            document.getElementById('ambientIntensity').value = 0.4;
+            document.getElementById('ambientValue').textContent = '0.40';
+            document.getElementById('directionalIntensity').value = 0.8;
+            document.getElementById('directionalValue').textContent = '0.80';
+            document.getElementById('cameraLightIntensity').value = 0.3;
+            document.getElementById('cameraLightValue').textContent = '0.30';
+            document.getElementById('lightDirX').value = 50;
+            document.getElementById('lightDirXValue').textContent = '50';
+            document.getElementById('lightDirY').value = 100;
+            document.getElementById('lightDirYValue').textContent = '100';
+            document.getElementById('lightDirZ').value = 50;
+            document.getElementById('lightDirZValue').textContent = '50';
+            document.getElementById('secondaryLightColor').value = '#4488ff';
+            
+            // Reset colors properly
+            scene.background = new THREE.Color(0x000000);
+            scene.fog = new THREE.Fog(0x000000, 100, 300);
+            material.color = new THREE.Color(0xffffff);
+            material.emissive = new THREE.Color(0x222222);
+            material.shininess = 100;
+            material.specular = new THREE.Color(0x444444);
+            boundaryMaterial.uniforms.waveColor.value = new THREE.Color(0x00ffff);
+            document.getElementById('bgColor').value = '#000000';
+            document.getElementById('waveColor').value = '#ffffff';
+            document.getElementById('boundaryColor').value = '#00ffff';
+            document.getElementById('shininess').value = 100;
+            document.getElementById('shininessValue').textContent = '100';
+            document.getElementById('specularIntensity').value = 0.4;
+            document.getElementById('specularValue').textContent = '0.40';
+            document.getElementById('fogNear').value = 100;
+            document.getElementById('fogNearValue').textContent = '100';
+            document.getElementById('fogFar').value = 300;
+            document.getElementById('fogFarValue').textContent = '300';
+            
+            // Reset waves
+            for (let i = 0; i <= gridSize; i++) {
+                heights[i] = new Array(gridSize + 1).fill(0);
+                velocities[i] = new Array(gridSize + 1).fill(0);
+            }
+            
+            // Update boundary shader
+            boundaryMaterial.uniforms.fadeZoneRatio.value = fadeZone / 200.0;
+            boundaryMaterial.uniforms.showBoundary.value = 0.0;
+            boundaryMaterial.uniforms.boundaryShape.value = 0.0;
+            
+            // Update equation display
+            updateEquation();
+        });
+        
+        // Hamburger menu toggle
+        document.getElementById('hamburger').addEventListener('click', () => {
+            document.getElementById('controls').classList.toggle('hidden');
+        });
+        
+        // Function to update equation display
+        function updateEquation() {
+            const gamma = 1 - damping; // Convert damping to dissipation coefficient
+            document.getElementById('eq-c2').textContent = (waveSpeed * waveSpeed).toFixed(3);
+            document.getElementById('eq-gamma').textContent = gamma.toFixed(4);
+        }
+        
+        document.getElementById('damping').addEventListener('input', (e) => {
+            damping = parseFloat(e.target.value);
+            document.getElementById('dampValue').textContent = damping.toFixed(4);
+            updateEquation();
+        });
+        
+        document.getElementById('tension').addEventListener('input', (e) => {
+            waveSpeed = parseFloat(e.target.value);
+            document.getElementById('tensionValue').textContent = waveSpeed.toFixed(2);
+            updateEquation();
+        });
+        
+        document.getElementById('mass').addEventListener('input', (e) => {
+            strikerMass = parseFloat(e.target.value);
+            document.getElementById('massValue').textContent = strikerMass;
+        });
+        
+        document.getElementById('velocity').addEventListener('input', (e) => {
+            strikerVelocity = parseFloat(e.target.value);
+            document.getElementById('velocityValue').textContent = strikerVelocity.toFixed(1);
+        });
+        
+        document.getElementById('strikeRadius').addEventListener('input', (e) => {
+            strikeRadius = parseInt(e.target.value);
+            document.getElementById('strikeRadiusValue').textContent = strikeRadius;
+        });
+        
+        document.getElementById('impulseCoeff').addEventListener('input', (e) => {
+            impulseCoeff = parseFloat(e.target.value);
+            document.getElementById('impulseCoeffValue').textContent = impulseCoeff.toFixed(3);
+        });
+        
+        document.getElementById('fadeZone').addEventListener('input', (e) => {
+            fadeZone = parseFloat(e.target.value);
+            document.getElementById('fadeZoneValue').textContent = fadeZone;
+            // Update boundary shader
+            boundaryMaterial.uniforms.fadeZoneRatio.value = fadeZone / 200.0;
+        });
+        
+        document.getElementById('waveHeight').addEventListener('input', (e) => {
+            waveHeightAmp = parseFloat(e.target.value);
+            document.getElementById('waveHeightValue').textContent = waveHeightAmp;
+        });
+        
+        document.getElementById('reflection').addEventListener('input', (e) => {
+            reflectionCoeff = parseFloat(e.target.value);
+            document.getElementById('reflectionValue').textContent = reflectionCoeff.toFixed(2);
+        });
+        
+        document.getElementById('absorptionPower').addEventListener('input', (e) => {
+            absorptionPower = parseFloat(e.target.value);
+            document.getElementById('absorptionPowerValue').textContent = absorptionPower.toFixed(1);
+        });
+        
+        document.getElementById('boundaryShape').addEventListener('change', (e) => {
+            boundaryShape = e.target.value;
+            boundaryMaterial.uniforms.boundaryShape.value = boundaryShape === 'circle' ? 1.0 : 0.0;
+        });
+        
+        document.getElementById('laplacianType').addEventListener('change', (e) => {
+            laplacianType = e.target.value;
+        });
+        
+        document.getElementById('bgColor').addEventListener('input', (e) => {
+            const color = e.target.value;
+            scene.background = new THREE.Color(color);
+            // Update fog to match background ONLY
+            scene.fog = new THREE.Fog(new THREE.Color(color), 100, 300);
+            // DO NOT affect wave or material colors!
+        });
+        
+        document.getElementById('waveColor').addEventListener('input', (e) => {
+            const color = e.target.value;
+            material.color = new THREE.Color(color);
+            material.emissive = new THREE.Color(color).multiplyScalar(0.2); // Emissive based on wave color
+            // DO NOT affect boundary color here!
+        });
+        
+        document.getElementById('boundaryColor').addEventListener('input', (e) => {
+            const color = e.target.value;
+            boundaryMaterial.uniforms.waveColor.value = new THREE.Color(color);
+        });
+        
+        document.getElementById('lightDirX').addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            directionalLight.position.x = val;
+            document.getElementById('lightDirXValue').textContent = val;
+        });
+        
+        document.getElementById('lightDirY').addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            directionalLight.position.y = val;
+            document.getElementById('lightDirYValue').textContent = val;
+        });
+        
+        document.getElementById('lightDirZ').addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            directionalLight.position.z = val;
+            document.getElementById('lightDirZValue').textContent = val;
+        });
+        
+        document.getElementById('secondaryLightColor').addEventListener('input', (e) => {
+            const color = e.target.value;
+            directionalLight2.color = new THREE.Color(color);
+        });
+        
+        document.getElementById('specularIntensity').addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            const currentColor = material.specular;
+            material.specular = new THREE.Color(val, val, val);
+            document.getElementById('specularValue').textContent = val.toFixed(2);
+        });
+        
+        document.getElementById('shininess').addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            material.shininess = val;
+            document.getElementById('shininessValue').textContent = val;
+        });
+        
+        document.getElementById('fogNear').addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            scene.fog.near = val;
+            document.getElementById('fogNearValue').textContent = val;
+        });
+        
+        document.getElementById('fogFar').addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            scene.fog.far = val;
+            document.getElementById('fogFarValue').textContent = val;
+        });
+        
+        document.getElementById('showBoundary').addEventListener('change', (e) => {
+            boundaryMaterial.uniforms.showBoundary.value = e.target.checked ? 1.0 : 0.0;
+        });
+        
+        document.getElementById('baseOpacity').addEventListener('input', (e) => {
+            baseOpacity = parseFloat(e.target.value);
+            document.getElementById('baseOpacityValue').textContent = baseOpacity.toFixed(2);
+        });
+        
+        document.getElementById('waveOpacity').addEventListener('input', (e) => {
+            waveOpacityMult = parseFloat(e.target.value);
+            document.getElementById('waveOpacityValue').textContent = waveOpacityMult.toFixed(1);
+        });
+        
+        document.getElementById('showReflection').addEventListener('change', (e) => {
+            // This will show visual feedback of reflection zones
+            // We'll implement this with a shader uniform if needed
+        });
+        
+        document.getElementById('ambientIntensity').addEventListener('input', (e) => {
+            const intensity = parseFloat(e.target.value);
+            ambientLight.intensity = intensity;
+            document.getElementById('ambientValue').textContent = intensity.toFixed(2);
+        });
+        
+        document.getElementById('directionalIntensity').addEventListener('input', (e) => {
+            const intensity = parseFloat(e.target.value);
+            directionalLight.intensity = intensity;
+            directionalLight2.intensity = intensity * 0.5; // Secondary light at half
+            document.getElementById('directionalValue').textContent = intensity.toFixed(2);
+        });
+        
+        document.getElementById('cameraLightIntensity').addEventListener('input', (e) => {
+            const intensity = parseFloat(e.target.value);
+            cameraLight.intensity = intensity;
+            document.getElementById('cameraLightValue').textContent = intensity.toFixed(2);
+        });
+        
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            updateWave();
+            
+            // Update camera light position to follow camera
+            cameraLight.position.copy(camera.position);
+            
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        
+        // Initialize equation display
+        updateEquation();
+        
+        animate();
+        
+        // New membrane size controls
+        document.getElementById('membraneSize').addEventListener('input', (e) => {
+            const newSize = parseFloat(e.target.value);
+            document.getElementById('membraneSizeValue').textContent = newSize;
+            // Update membrane geometry
+            membraneSize = newSize;
+            membrane.geometry.dispose();
+            boundaryMesh.geometry.dispose();
+            membrane.geometry = new THREE.PlaneGeometry(membraneSize, membraneSize, gridSize, gridSize);
+            boundaryMesh.geometry = new THREE.PlaneGeometry(membraneSize, membraneSize, 2, 2);
+            // Update boundary shader
+            boundaryMaterial.uniforms.fadeZoneRatio.value = fadeZone / gridSize;
+        });
+        
+        document.getElementById('gridResolution').addEventListener('input', (e) => {
+            const newRes = parseInt(e.target.value);
+            document.getElementById('gridResolutionValue').textContent = newRes;
+            // Note: Changing grid resolution requires rebuilding arrays - complex operation
+            // For now just update the display value, full implementation would require restart
+        });
+        
+        // Interactive equation - clicking parameters scrolls to their controls
+        document.querySelectorAll('.equation-param').forEach(param => {
+            param.addEventListener('click', (e) => {
+                const controlId = e.target.getAttribute('data-control');
+                if (controlId) {
+                    const controlElement = document.getElementById(controlId);
+                    if (controlElement) {
+                        // Scroll to and highlight the control
+                        controlElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        controlElement.style.boxShadow = '0 0 10px #ffff00';
+                        setTimeout(() => {
+                            controlElement.style.boxShadow = '';
+                        }, 2000);
+                    }
+                }
+            });
+        });
+
+        // Handle resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        // Keyboard shortcut - press 'h' to hide/show controls
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'h' || e.key === 'H') {
+                document.getElementById('controls').classList.toggle('hidden');
+            }
+        });
+        
+        // NO initial strike - user starts with calm membrane
+    </script>
+</body>
+</html>

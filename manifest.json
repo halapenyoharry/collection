@@ -25,6 +25,46 @@
       "path": "experiences/configurable-fountain/index.html",
       "tags": ["physics", "particle", "canvas"],
       "added": "2026-04-17"
+    },
+    {
+      "id": "procedural-visuals",
+      "title": "Procedural Visuals",
+      "description": "A suite of generative sketches — circle packing, crystalline growth, cellular automata, and more.",
+      "path": "experiences/procedural-visuals/index.html",
+      "tags": ["generative", "art", "canvas", "procedural"],
+      "added": "2026-04-18"
+    },
+    {
+      "id": "math-thing",
+      "title": "Membrane Physics",
+      "description": "2D wave-equation simulations on a vibrating membrane, rendered in three.js.",
+      "path": "experiences/math-thing/index.html",
+      "tags": ["physics", "simulation", "three.js", "math"],
+      "added": "2026-04-18"
+    },
+    {
+      "id": "throatsinging-simulator",
+      "title": "Throat Singing Simulator",
+      "description": "Web Audio synthesis of khoomei, sygyt, and kargyraa styles with live voice controls.",
+      "path": "experiences/throatsinging-simulator/index.html",
+      "tags": ["audio", "synthesis", "web-audio"],
+      "added": "2026-04-18"
+    },
+    {
+      "id": "med-curves",
+      "title": "MedCurvez",
+      "description": "AUC-preserving gastric delay model — interactive dose/absorption curves across medications.",
+      "path": "experiences/med-curves/med-curves-v3.html",
+      "tags": ["data-viz", "medical", "interactive"],
+      "added": "2026-04-18"
+    },
+    {
+      "id": "image-browse-physics",
+      "title": "Image Browse — Physics",
+      "description": "Drop a folder of images and browse them through D3-driven physics fields.",
+      "path": "experiences/image-browse-physics/index.html",
+      "tags": ["data-viz", "d3", "physics", "interactive"],
+      "added": "2026-04-18"
     }
   ]
 }

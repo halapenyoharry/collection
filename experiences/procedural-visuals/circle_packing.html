@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orbital Circle Packing Generator</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a1a;
+    color: #e0d8c8;
+    font-family: 'Courier New', monospace;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+  #controls {
+    width: 280px;
+    min-width: 280px;
+    padding: 16px;
+    background: #2a2520;
+    overflow-y: auto;
+    border-right: 1px solid #4a4035;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  #controls h2 {
+    font-size: 13px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #c8b89a;
+    margin-bottom: 2px;
+  }
+  .cg {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .cg label {
+    font-size: 10px;
+    color: #a09080;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .cg input[type="range"] {
+    width: 100%;
+    accent-color: #c8a050;
+    cursor: pointer;
+  }
+  .cg .val {
+    font-size: 10px;
+    color: #c8b89a;
+    text-align: right;
+  }
+  button#generate {
+    margin-top: 6px;
+    padding: 10px;
+    background: #c8a050;
+    color: #1a1a1a;
+    border: none;
+    font-family: inherit;
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  button#generate:hover { background: #ddb060; }
+  button#save {
+    padding: 8px;
+    background: transparent;
+    color: #a09080;
+    border: 1px solid #4a4035;
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  button#save:hover { border-color: #c8a050; color: #c8b89a; }
+  #canvas-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: #111;
+  }
+  canvas { max-width: 100%; max-height: 100%; }
+  .sep { border-top: 1px solid #3a3530; margin: 4px 0; }
+  #status { font-size: 10px; color: #807060; min-height: 14px; }
+</style>
+</head>
+<body>
+
+<div id="controls">
+  <h2>Orbital Packing</h2>
+
+  <div class="cg">
+    <label>Recursion Depth</label>
+    <input type="range" id="maxDepth" min="2" max="5" value="4" step="1">
+    <div class="val" id="maxDepthVal">4</div>
+  </div>
+
+  <div class="cg">
+    <label>Pack Attempts</label>
+    <input type="range" id="density" min="500" max="6000" value="3500" step="100">
+    <div class="val" id="densityVal">3500</div>
+  </div>
+
+  <div class="cg">
+    <label>Min Circle Radius</label>
+    <input type="range" id="minSize" min="2" max="12" value="3" step="1">
+    <div class="val" id="minSizeVal">3</div>
+  </div>
+
+  <div class="cg">
+    <label>Max Start Radius</label>
+    <input type="range" id="maxRadius" min="60" max="300" value="160" step="10">
+    <div class="val" id="maxRadiusVal">160</div>
+  </div>
+
+  <div class="cg">
+    <label>Orbital Rings</label>
+    <input type="range" id="orbitalRings" min="1" max="5" value="3" step="1">
+    <div class="val" id="orbitalRingsVal">3</div>
+  </div>
+
+  <div class="cg">
+    <label>Spiral Twist</label>
+    <input type="range" id="spiralTwist" min="0" max="200" value="80" step="5">
+    <div class="val" id="spiralTwistVal">80</div>
+  </div>
+
+  <div class="cg">
+    <label>Orbit Wobble</label>
+    <input type="range" id="wobble" min="0" max="100" value="40" step="5">
+    <div class="val" id="wobbleVal">40</div>
+  </div>
+
+  <div class="cg">
+    <label>Accent Chance (%)</label>
+    <input type="range" id="accentProb" min="0" max="40" value="10" step="1">
+    <div class="val" id="accentProbVal">10%</div>
+  </div>
+
+  <div class="cg">
+    <label>Gap Fill Density</label>
+    <input type="range" id="gapFill" min="0" max="100" value="90" step="5">
+    <div class="val" id="gapFillVal">90%</div>
+  </div>
+
+  <div class="cg">
+    <label>Stroke Weight</label>
+    <input type="range" id="lineWidth" min="0.3" max="2.5" value="0.7" step="0.1">
+    <div class="val" id="lineWidthVal">0.7</div>
+  </div>
+
+  <div class="cg">
+    <label>Circle Padding</label>
+    <input type="range" id="padding" min="0" max="6" value="1" step="0.5">
+    <div class="val" id="paddingVal">1</div>
+  </div>
+
+  <div class="sep"></div>
+
+  <div class="cg">
+    <label>Seed</label>
+    <input type="range" id="seed" min="1" max="9999" value="42" step="1">
+    <div class="val" id="seedVal">42</div>
+  </div>
+
+  <button id="generate">Generate</button>
+  <button id="save">Save PNG</button>
+  <div id="status"></div>
+</div>
+
+<div id="canvas-wrap">
+  <canvas id="c"></canvas>
+</div>
+
+<script>
+function mulberry32(a) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    var t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  }
+}
+
+let rng;
+
+const PALETTE = {
+  bg: '#3d3535',
+  fill: ['#f0ead6','#ede7d1','#e8e2cc','#f2eddb','#eee8d4','#ebe5cf'],
+  stroke: '#5a4838',
+  strokeLight: '#7a6a58',
+  accents: [
+    '#2255aa','#3366cc',
+    '#6fc8d0','#5bbac4',
+    '#aa2233','#cc3344',
+    '#d4a020','#e8b830',
+    '#e87820',
+  ]
+};
+
+function S() {
+  return {
+    maxDepth: +document.getElementById('maxDepth').value,
+    density: +document.getElementById('density').value,
+    minSize: +document.getElementById('minSize').value,
+    maxRadius: +document.getElementById('maxRadius').value,
+    orbitalRings: +document.getElementById('orbitalRings').value,
+    spiralTwist: +document.getElementById('spiralTwist').value / 100, // 0-2 radians twist per ring
+    wobble: +document.getElementById('wobble').value / 100,
+    accentProb: +document.getElementById('accentProb').value / 100,
+    gapFill: +document.getElementById('gapFill').value / 100,
+    lineWidth: +document.getElementById('lineWidth').value,
+    padding: +document.getElementById('padding').value,
+    seed: +document.getElementById('seed').value,
+  };
+}
+
+// Pack non-overlapping circles into a circular boundary via rejection
+function packInto(bx, by, br, minR, maxR, attempts, pad) {
+  const placed = [];
+  for (let i = 0; i < attempts; i++) {
+    const t = rng();
+    let r;
+    if (t < 0.15) r = minR + rng() * (maxR - minR);
+    else if (t < 0.5) r = minR + rng() * Math.max(maxR * 0.35, minR);
+    else r = minR + rng() * Math.max(maxR * 0.12, minR);
+    r = Math.max(r, minR);
+    if (r > br * 0.85) continue;
+
+    const angle = rng() * Math.PI * 2;
+    const maxDist = br - r - pad * 0.3;
+    if (maxDist <= 0) continue;
+    const dist = Math.sqrt(rng()) * maxDist;
+    const x = bx + Math.cos(angle) * dist;
+    const y = by + Math.sin(angle) * dist;
+    if (Math.hypot(x - bx, y - by) + r > br - pad * 0.3) continue;
+
+    let ok = true;
+    for (let j = 0; j < placed.length; j++) {
+      if (Math.hypot(x - placed[j].x, y - placed[j].y) < r + placed[j].r + pad) {
+        ok = false; break;
+      }
+    }
+    if (ok) placed.push({x, y, r});
+  }
+  return placed;
+}
+
+function packRect(W, H, minR, maxR, attempts, pad) {
+  const placed = [];
+  for (let i = 0; i < attempts; i++) {
+    const t = rng();
+    let r;
+    if (t < 0.12) r = maxR * (0.6 + rng() * 0.4);
+    else if (t < 0.35) r = maxR * (0.3 + rng() * 0.3);
+    else if (t < 0.65) r = maxR * (0.1 + rng() * 0.2);
+    else r = minR + rng() * Math.max(maxR * 0.1, minR);
+    r = Math.max(r, minR);
+
+    const x = r + rng() * (W - 2 * r);
+    const y = r + rng() * (H - 2 * r);
+
+    let ok = true;
+    for (let j = 0; j < placed.length; j++) {
+      if (Math.hypot(x - placed[j].x, y - placed[j].y) < r + placed[j].r + pad) {
+        ok = false; break;
+      }
+    }
+    if (ok) placed.push({x, y, r});
+  }
+  return placed;
+}
+
+// Draw a single circle with its orbital children
+function drawOrbital(ctx, cx, cy, r, depth, s) {
+  if (r < 1.5) return;
+
+  const fillColor = PALETTE.fill[Math.floor(rng() * PALETTE.fill.length)];
+  const isAccent = rng() < s.accentProb;
+  const accent1 = PALETTE.accents[Math.floor(rng() * PALETTE.accents.length)];
+  const accent2 = PALETTE.accents[Math.floor(rng() * PALETTE.accents.length)];
+
+  // Fill base circle
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = fillColor;
+  ctx.fill();
+
+  // Outer stroke
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.strokeStyle = isAccent ? accent1 : PALETTE.stroke;
+  ctx.lineWidth = s.lineWidth * (isAccent ? 2 : 1.1);
+  ctx.stroke();
+
+  // Draw faint orbital path rings (thin, subtle)
+  const numOrbits = Math.min(s.orbitalRings, Math.max(1, Math.floor(r / 15)));
+  for (let i = 0; i < numOrbits; i++) {
+    const orbitR = r * ((i + 1) / (numOrbits + 1.2));
+    if (orbitR < 4) continue;
+    ctx.beginPath();
+    ctx.arc(cx, cy, orbitR, 0, Math.PI * 2);
+    ctx.strokeStyle = PALETTE.strokeLight;
+    ctx.lineWidth = s.lineWidth * 0.4;
+    ctx.globalAlpha = 0.35;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  // Center nucleus
+  if (r > 5) {
+    const nucleusR = r * (0.08 + rng() * 0.1);
+    ctx.beginPath();
+    ctx.arc(cx, cy, nucleusR, 0, Math.PI * 2);
+    ctx.fillStyle = isAccent ? accent1 : PALETTE.stroke;
+    ctx.fill();
+
+    if (isAccent && r > 12) {
+      // Colored ring around nucleus
+      const innerRingR = r * (0.15 + rng() * 0.08);
+      ctx.beginPath();
+      ctx.arc(cx, cy, innerRingR, 0, Math.PI * 2);
+      ctx.strokeStyle = accent2;
+      ctx.lineWidth = s.lineWidth * 1.3;
+      ctx.stroke();
+    }
+  }
+
+  // Place children along spiral orbits
+  if (depth < s.maxDepth && r > s.minSize * 5) {
+    // Collect all children placed so far (for overlap checking)
+    const placed = [];
+    const pad = s.padding * 0.7;
+
+    // For each orbital ring, place circles along a spiral arc
+    for (let oi = 0; oi < numOrbits; oi++) {
+      const orbitR = r * ((oi + 1) / (numOrbits + 1.2));
+      const availableArc = 2 * Math.PI;
+      // How many children fit on this orbit?
+      const childMaxR = Math.min(r * 0.35, orbitR * 0.5);
+      const childMinR = Math.max(s.minSize, 2);
+      if (childMaxR < childMinR) continue;
+
+      // Spiral starting angle with twist
+      let angle = rng() * Math.PI * 2;
+      const twistPerChild = s.spiralTwist * (0.3 + rng() * 0.7);
+
+      // Estimate how many children we can fit
+      const circumference = 2 * Math.PI * orbitR;
+      const avgChildR = (childMaxR + childMinR) * 0.4;
+      const maxChildren = Math.floor(circumference / (avgChildR * 2 + pad));
+
+      for (let ci = 0; ci < maxChildren; ci++) {
+        let cr;
+        const t = rng();
+        if (t < 0.25) cr = childMinR + rng() * (childMaxR - childMinR);
+        else if (t < 0.6) cr = childMinR + rng() * (childMaxR * 0.4);
+        else cr = childMinR + rng() * (childMaxR * 0.15);
+        cr = Math.max(cr, childMinR);
+
+        // Wobble the orbit distance
+        const wobbleAmt = orbitR * s.wobble * (rng() - 0.5) * 0.5;
+        const dist = orbitR + wobbleAmt;
+
+        const cx2 = cx + Math.cos(angle) * dist;
+        const cy2 = cy + Math.sin(angle) * dist;
+
+        // Check containment in parent
+        if (Math.hypot(cx2 - cx, cy2 - cy) + cr > r - pad * 0.3) {
+          angle += twistPerChild * 0.3;
+          continue;
+        }
+
+        // Check overlap with siblings
+        let ok = true;
+        for (const p of placed) {
+          if (Math.hypot(cx2 - p.x, cy2 - p.y) < cr + p.r + pad) {
+            ok = false; break;
+          }
+        }
+
+        if (ok) {
+          placed.push({x: cx2, y: cy2, r: cr});
+          drawOrbital(ctx, cx2, cy2, cr, depth + 1, s);
+        }
+
+        // Advance angle with spiral twist
+        const arcStep = (cr * 2 + pad) / Math.max(orbitR, 1);
+        angle += arcStep + twistPerChild * 0.15;
+      }
+    }
+
+    // Fill remaining interior gaps with rejection-sampled circles
+    const fillAttempts = Math.floor(s.density * 0.15 * (r / s.maxRadius));
+    for (let i = 0; i < fillAttempts; i++) {
+      const t = rng();
+      let cr = t < 0.3
+        ? s.minSize + rng() * (r * 0.15)
+        : s.minSize + rng() * (r * 0.06);
+      cr = Math.max(cr, s.minSize);
+
+      const a = rng() * Math.PI * 2;
+      const d = Math.sqrt(rng()) * (r - cr - pad);
+      if (d <= 0) continue;
+      const cx2 = cx + Math.cos(a) * d;
+      const cy2 = cy + Math.sin(a) * d;
+
+      if (Math.hypot(cx2 - cx, cy2 - cy) + cr > r - pad * 0.3) continue;
+
+      let ok = true;
+      for (const p of placed) {
+        if (Math.hypot(cx2 - p.x, cy2 - p.y) < cr + p.r + pad) {
+          ok = false; break;
+        }
+      }
+      if (ok) {
+        placed.push({x: cx2, y: cy2, r: cr});
+        drawOrbital(ctx, cx2, cy2, cr, depth + 1, s);
+      }
+    }
+  }
+  // Terminal: small circles get a concentric ring + dot
+  else if (r > 3.5) {
+    if (r > 6) {
+      const ringR = r * (0.55 + rng() * 0.15);
+      ctx.beginPath();
+      ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
+      ctx.strokeStyle = isAccent ? accent1 : PALETTE.stroke;
+      ctx.lineWidth = s.lineWidth * 0.6;
+      ctx.stroke();
+    }
+    const dotR = r * (0.15 + rng() * 0.12);
+    ctx.beginPath();
+    ctx.arc(cx, cy, dotR, 0, Math.PI * 2);
+    ctx.fillStyle = rng() < s.accentProb
+      ? PALETTE.accents[Math.floor(rng() * PALETTE.accents.length)]
+      : PALETTE.stroke;
+    ctx.fill();
+  }
+}
+
+function generate() {
+  const s = S();
+  rng = mulberry32(s.seed);
+  const status = document.getElementById('status');
+  status.textContent = 'Generating...';
+
+  setTimeout(() => {
+    const canvas = document.getElementById('c');
+    const W = 1400, H = 900;
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = PALETTE.bg;
+    ctx.fillRect(0, 0, W, H);
+
+    // Main packing
+    const top = packRect(W, H, s.minSize, s.maxRadius, s.density, s.padding);
+    top.sort((a, b) => b.r - a.r);
+
+    const allCircles = [...top];
+
+    for (const c of top) {
+      drawOrbital(ctx, c.x, c.y, c.r, 0, s);
+    }
+
+    // Gap filling passes
+    if (s.gapFill > 0) {
+      const passes = [
+        {maxR: 20, minR: 5, att: Math.floor(5000 * s.gapFill)},
+        {maxR: 8, minR: 3, att: Math.floor(6000 * s.gapFill)},
+        {maxR: 4, minR: 1.5, att: Math.floor(5000 * s.gapFill)},
+      ];
+      for (const pass of passes) {
+        for (let i = 0; i < pass.att; i++) {
+          const r = pass.minR + rng() * (pass.maxR - pass.minR);
+          const x = r + rng() * (W - 2 * r);
+          const y = r + rng() * (H - 2 * r);
+          let ok = true;
+          for (let j = 0; j < allCircles.length; j++) {
+            if (Math.hypot(x - allCircles[j].x, y - allCircles[j].y) < r + allCircles[j].r + s.padding * 0.4) {
+              ok = false; break;
+            }
+          }
+          if (ok) {
+            allCircles.push({x, y, r});
+            drawOrbital(ctx, x, y, r, s.maxDepth - 1, s);
+          }
+        }
+      }
+
+      // Tiny residual dots
+      for (let i = 0; i < Math.floor(5000 * s.gapFill); i++) {
+        const x = rng() * W, y = rng() * H;
+        const r = 0.5 + rng() * 1.5;
+        let ok = true;
+        for (let j = 0; j < allCircles.length; j++) {
+          if (Math.hypot(x - allCircles[j].x, y - allCircles[j].y) < allCircles[j].r + 0.3) {
+            ok = false; break;
+          }
+        }
+        if (ok) {
+          ctx.beginPath();
+          ctx.arc(x, y, r, 0, Math.PI * 2);
+          ctx.fillStyle = PALETTE.stroke;
+          ctx.globalAlpha = 0.3 + rng() * 0.35;
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+      }
+    }
+
+    status.textContent = `Done — ${top.length} top-level circles`;
+  }, 20);
+}
+
+// Wire controls
+const ids = ['maxDepth','density','minSize','maxRadius','orbitalRings','spiralTwist','wobble','accentProb','gapFill','lineWidth','padding','seed'];
+ids.forEach(id => {
+  const el = document.getElementById(id);
+  const valEl = document.getElementById(id + 'Val');
+  el.addEventListener('input', () => {
+    let v = el.value;
+    if (id === 'accentProb' || id === 'gapFill') v += '%';
+    valEl.textContent = v;
+  });
+});
+
+document.getElementById('generate').addEventListener('click', generate);
+document.getElementById('save').addEventListener('click', () => {
+  const link = document.createElement('a');
+  link.download = 'orbital_packing.png';
+  link.href = document.getElementById('c').toDataURL('image/png');
+  link.click();
+});
+
+generate();
+</script>
+</body>
+</html>

@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Membrane Physics - Proper Implementation</title>
+    <meta charset="utf-8">
+    <style>
+        body { 
+            margin: 0; 
+            background: #000; 
+            overflow: hidden; 
+            font-family: 'Courier New', monospace; 
+            color: white;
+        }
+        canvas { display: block; }
+        
+        .equation {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 20, 40, 0.9);
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 18px;
+            color: #0ff;
+            text-align: center;
+            border: 1px solid #444;
+        }
+        
+        #controls {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.95);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            width: 350px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+            font-size: 13px;
+        }
+        
+        .control-section {
+            margin: 15px 0;
+            border-top: 1px solid #333;
+            padding-top: 10px;
+        }
+        
+        .control-section:first-child {
+            border-top: none;
+            margin-top: 0;
+        }
+        
+        .control-group {
+            margin: 12px 0;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #bbb;
+            font-weight: bold;
+        }
+        
+        .param-physics {
+            background: rgba(0, 40, 0, 0.3);
+            padding: 8px;
+            border-radius: 4px;
+            border-left: 3px solid #0a0;
+        }
+        
+        .param-visual {
+            background: rgba(40, 20, 0, 0.3);
+            padding: 8px;
+            border-radius: 4px;
+            border-left: 3px solid #fa0;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            margin: 5px 0;
+        }
+        
+        .value-display {
+            display: inline-block;
+            min-width: 60px;
+            font-weight: bold;
+            color: #0ff;
+        }
+        
+        .range-info {
+            font-size: 11px;
+            color: #666;
+            margin-top: 3px;
+        }
+        
+        .emergent {
+            background: rgba(20, 40, 20, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #0a0;
+            margin: 10px 0;
+        }
+        
+        .emergent-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: #0f0;
+        }
+        
+        button {
+            background: #333;
+            color: white;
+            border: 1px solid #666;
+            padding: 8px 15px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        
+        button:hover {
+            background: #555;
+        }
+        
+        .instructions {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            color: #888;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="equation">
+        ∂²u/∂t² = (T/ρ)∇²u - γ(∂u/∂t)
+    </div>
+    
+    <div id="controls">
+        <h3 style="margin-top: 0; color: #0ff;">Membrane Physics Control</h3>
+        
+        <div class="control-section">
+            <h4 style="color: #0a0;">Physics Parameters (Equation)</h4>
+            
+            <div class="control-group param-physics">
+                <label>T - Tension (N/m)</label>
+                <input type="range" id="tension" min="10" max="1000" value="200" step="10">
+                <span class="value-display" id="tensionValue">200</span> N/m
+                <div class="range-info">Range: 10-1000 N/m (force per unit length)</div>
+            </div>
+            
+            <div class="control-group param-physics">
+                <label>ρ - Surface Density (kg/m²)</label>
+                <input type="range" id="density" min="0.1" max="10" value="1.0" step="0.1">
+                <span class="value-display" id="densityValue">1.0</span> kg/m²
+                <div class="range-info">Range: 0.1-10 kg/m² (mass per unit area)</div>
+            </div>
+            
+            <div class="control-group param-physics">
+                <label>γ - Damping Coefficient (s⁻¹)</label>
+                <input type="range" id="damping" min="0" max="5" value="0.5" step="0.1">
+                <span class="value-display" id="dampingValue">0.5</span> s⁻¹
+                <div class="range-info">Range: 0-5 s⁻¹ (energy dissipation rate)</div>
+            </div>
+            
+            <div class="emergent">
+                <label>c = √(T/ρ) - Wave Speed (EMERGENT)</label>
+                <div class="emergent-value" id="waveSpeed">14.1 m/s</div>
+                <div class="range-info">Automatically calculated from T and ρ</div>
+            </div>
+        </div>
+        
+        <div class="control-section">
+            <h4 style="color: #fa0;">Visualization Parameters</h4>
+            
+            <div class="control-group param-visual">
+                <label>Wave Height Amplification</label>
+                <input type="range" id="amplitude" min="1" max="50" value="20" step="1">
+                <span class="value-display" id="amplitudeValue">20</span>x
+                <div class="range-info">Range: 1-50x (display scaling only)</div>
+            </div>
+            
+            <div class="control-group param-visual">
+                <label>Membrane Base Opacity</label>
+                <input type="range" id="baseOpacity" min="0" max="1" value="0.3" step="0.05">
+                <span class="value-display" id="baseOpacityValue">0.30</span>
+                <div class="range-info">Range: 0.0-1.0 (membrane visibility when flat)</div>
+            </div>
+            
+            <div class="control-group param-visual">
+                <label>Membrane Color</label>
+                <input type="color" id="membraneColor" value="#ffffff">
+                <div class="range-info">Visual appearance only</div>
+            </div>
+            
+            <div class="control-group param-visual">
+                <label>Background Color</label>
+                <input type="color" id="backgroundColor" value="#000000">
+                <div class="range-info">Scene background</div>
+            </div>
+        </div>
+        
+        <div class="control-section">
+            <h4 style="color: #0ff;">Interaction</h4>
+            
+            <div class="control-group">
+                <label>Strike Force</label>
+                <input type="range" id="strikeForce" min="0.1" max="5" value="1" step="0.1">
+                <span class="value-display" id="strikeForceValue">1.0</span>
+                <div class="range-info">Range: 0.1-5.0 (impulse strength)</div>
+            </div>
+            
+            <div class="control-group">
+                <button id="resetWaves">Reset Membrane</button>
+                <button id="centerStrike">Strike Center</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="instructions">
+        <strong>Click</strong> membrane to create waves • <strong>Drag</strong> to rotate • <strong>Scroll</strong> to zoom
+    </div>
+    
+    <script src="../_vendor/three.r128.min.js"></script>
+    <script src="../_vendor/three-TrackballControls.r128.js"></script>
+    
+    <script>
+        // Physics constants (proper membrane mechanics)
+        let T = 200;        // Tension (N/m)
+        let rho = 1.0;      // Surface density (kg/m²)
+        let gamma = 0.5;    // Damping coefficient (s⁻¹)
+        let c = Math.sqrt(T / rho);  // Wave speed (emergent)
+        
+        // Visualization parameters
+        let waveAmplitude = 20;
+        let baseOpacity = 0.3;
+        let strikeForce = 1.0;
+        
+        // Simulation parameters
+        const N = 128;      // Grid resolution
+        const L = 20;       // Physical size
+        const dt = 0.01;    // Time step
+        const dx = L / N;   // Spatial step
+        
+        // Wave field arrays
+        let u = new Array(N);      // Current displacement
+        let u_prev = new Array(N); // Previous displacement
+        let u_next = new Array(N); // Next displacement
+        
+        for (let i = 0; i < N; i++) {
+            u[i] = new Array(N).fill(0);
+            u_prev[i] = new Array(N).fill(0);
+            u_next[i] = new Array(N).fill(0);
+        }
+        
+        // Three.js setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+        
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(50, 50, 50);
+        scene.add(directionalLight);
+        
+        // Membrane geometry
+        const geometry = new THREE.PlaneGeometry(L, L, N-1, N-1);
+        const material = new THREE.MeshPhongMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: baseOpacity,
+            side: THREE.DoubleSide,
+            wireframe: false
+        });
+        const membrane = new THREE.Mesh(geometry, material);
+        membrane.rotation.x = -Math.PI / 2;
+        scene.add(membrane);
+        
+        // Camera and controls
+        camera.position.set(15, 10, 15);
+        const controls = new THREE.TrackballControls(camera, renderer.domElement);
+        controls.rotateSpeed = 2.0;
+        controls.zoomSpeed = 1.2;
+        controls.panSpeed = 0.8;
+        controls.staticMoving = true;
+        controls.dynamicDampingFactor = 0.3;
+        
+        // Update physics parameters
+        function updatePhysics() {
+            c = Math.sqrt(T / rho);
+            document.getElementById('waveSpeed').textContent = c.toFixed(1) + ' m/s';
+        }
+        
+        // Wave equation integration using finite differences
+        function integrate() {
+            const dtSquared = dt * dt;
+            const cSquared = c * c;
+            const dxSquared = dx * dx;
+            const factor = cSquared * dtSquared / dxSquared;
+            const dampingFactor = gamma * dt;
+            
+            for (let i = 1; i < N-1; i++) {
+                for (let j = 1; j < N-1; j++) {
+                    // Laplacian (∇²u)
+                    const laplacian = (u[i+1][j] + u[i-1][j] + u[i][j+1] + u[i][j-1] - 4*u[i][j]);
+                    
+                    // Wave equation: ∂²u/∂t² = (T/ρ)∇²u - γ(∂u/∂t)
+                    // Using finite differences: u_next = 2u - u_prev + dt²[(T/ρ)∇²u - γ(u-u_prev)/dt]
+                    const velocity = (u[i][j] - u_prev[i][j]) / dt;
+                    const acceleration = factor * laplacian - dampingFactor * velocity;
+                    
+                    u_next[i][j] = 2 * u[i][j] - u_prev[i][j] + dtSquared * acceleration;
+                }
+            }
+            
+            // Boundary conditions (fixed edges)
+            for (let i = 0; i < N; i++) {
+                u_next[i][0] = 0;
+                u_next[i][N-1] = 0;
+                u_next[0][i] = 0;
+                u_next[N-1][i] = 0;
+            }
+            
+            // Swap arrays
+            [u_prev, u, u_next] = [u, u_next, u_prev];
+        }
+        
+        // Update membrane geometry
+        function updateGeometry() {
+            const positions = membrane.geometry.attributes.position.array;
+            let maxDisplacement = 0;
+            
+            for (let i = 0; i < N; i++) {
+                for (let j = 0; j < N; j++) {
+                    const index = (i * N + j) * 3 + 2; // z-component
+                    const displacement = u[i][j] * waveAmplitude;
+                    positions[index] = displacement;
+                    maxDisplacement = Math.max(maxDisplacement, Math.abs(displacement));
+                }
+            }
+            
+            membrane.geometry.attributes.position.needsUpdate = true;
+            membrane.geometry.computeVertexNormals();
+            
+            // Dynamic opacity based on wave activity
+            const activityOpacity = Math.min(maxDisplacement / 5, 0.8);
+            material.opacity = baseOpacity + activityOpacity;
+        }
+        
+        // Add wave disturbance
+        function addDisturbance(x, z, amplitude) {
+            const gridX = Math.round((x + L/2) / L * (N-1));
+            const gridZ = Math.round((z + L/2) / L * (N-1));
+            const radius = 3;
+            
+            for (let i = Math.max(0, gridX - radius); i <= Math.min(N-1, gridX + radius); i++) {
+                for (let j = Math.max(0, gridZ - radius); j <= Math.min(N-1, gridZ + radius); j++) {
+                    const dist = Math.sqrt((i - gridX)**2 + (j - gridZ)**2);
+                    if (dist <= radius) {
+                        const factor = Math.exp(-dist**2 / (2 * radius**2 / 4));
+                        u[i][j] += amplitude * factor;
+                    }
+                }
+            }
+        }
+        
+        // Mouse interaction
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        
+        renderer.domElement.addEventListener('click', (event) => {
+            if (event.target.tagName === 'CANVAS') {
+                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+                
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObject(membrane);
+                
+                if (intersects.length > 0) {
+                    const point = intersects[0].point;
+                    addDisturbance(point.x, point.z, strikeForce);
+                }
+            }
+        });
+        
+        // Control event handlers
+        document.getElementById('tension').addEventListener('input', (e) => {
+            T = parseFloat(e.target.value);
+            document.getElementById('tensionValue').textContent = T;
+            updatePhysics();
+        });
+        
+        document.getElementById('density').addEventListener('input', (e) => {
+            rho = parseFloat(e.target.value);
+            document.getElementById('densityValue').textContent = rho.toFixed(1);
+            updatePhysics();
+        });
+        
+        document.getElementById('damping').addEventListener('input', (e) => {
+            gamma = parseFloat(e.target.value);
+            document.getElementById('dampingValue').textContent = gamma.toFixed(1);
+        });
+        
+        document.getElementById('amplitude').addEventListener('input', (e) => {
+            waveAmplitude = parseFloat(e.target.value);
+            document.getElementById('amplitudeValue').textContent = waveAmplitude;
+        });
+        
+        document.getElementById('baseOpacity').addEventListener('input', (e) => {
+            baseOpacity = parseFloat(e.target.value);
+            document.getElementById('baseOpacityValue').textContent = baseOpacity.toFixed(2);
+        });
+        
+        document.getElementById('strikeForce').addEventListener('input', (e) => {
+            strikeForce = parseFloat(e.target.value);
+            document.getElementById('strikeForceValue').textContent = strikeForce.toFixed(1);
+        });
+        
+        document.getElementById('membraneColor').addEventListener('input', (e) => {
+            material.color.setHex(parseInt(e.target.value.slice(1), 16));
+        });
+        
+        document.getElementById('backgroundColor').addEventListener('input', (e) => {
+            scene.background = new THREE.Color(parseInt(e.target.value.slice(1), 16));
+        });
+        
+        document.getElementById('resetWaves').addEventListener('click', () => {
+            for (let i = 0; i < N; i++) {
+                for (let j = 0; j < N; j++) {
+                    u[i][j] = 0;
+                    u_prev[i][j] = 0;
+                    u_next[i][j] = 0;
+                }
+            }
+        });
+        
+        document.getElementById('centerStrike').addEventListener('click', () => {
+            addDisturbance(0, 0, strikeForce);
+        });
+        
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            integrate();
+            updateGeometry();
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        
+        // Initialize
+        updatePhysics();
+        animate();
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Throat Singing Simulator</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #f0f0f0;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #4a9eff;
+        }
+        
+        .control-group {
+            background: #2a2a2a;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        
+        .control {
+            margin: 15px 0;
+        }
+        
+        label {
+            display: inline-block;
+            width: 200px;
+            font-weight: 500;
+        }
+        
+        input[type="range"] {
+            width: 300px;
+            vertical-align: middle;
+        }
+        
+        .value {
+            display: inline-block;
+            width: 60px;
+            text-align: right;
+            color: #4a9eff;
+            font-family: monospace;
+        }
+        
+        .style-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        button {
+            background: #4a9eff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        
+        button:hover {
+            background: #357abd;
+            transform: translateY(-2px);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button.active {
+            background: #2ecc71;
+        }
+        
+        #start-button {
+            display: block;
+            margin: 30px auto;
+            font-size: 20px;
+            padding: 15px 40px;
+        }
+        
+        #visualizer {
+            width: 100%;
+            height: 200px;
+            background: #0a0a0a;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .info {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <h1>Throat Singing Simulator</h1>
+    
+    <button id="start-button">Start Audio</button>
+    
+    <div class="control-group">
+        <h3>Singing Style</h3>
+        <div class="style-buttons">
+            <button class="style-button active" data-style="0">Khoomei</button>
+            <button class="style-button" data-style="1">Sygyt</button>
+            <button class="style-button" data-style="2">Kargyraa</button>
+        </div>
+    </div>
+    
+    <div class="control-group">
+        <h3>Voice Controls</h3>
+        <div class="control">
+            <label>Fundamental Frequency:</label>
+            <input type="range" id="fundamental" min="60" max="300" value="110" step="1">
+            <span class="value" id="fundamental-value">110 Hz</span>
+        </div>
+        
+        <div class="control">
+            <label>Overtone Emphasis:</label>
+            <input type="range" id="overtone" min="0" max="100" value="50" step="1">
+            <span class="value" id="overtone-value">50%</span>
+        </div>
+        
+        <div class="control">
+            <label>Throat Tension:</label>
+            <input type="range" id="tension" min="-100" max="100" value="0" step="1">
+            <span class="value" id="tension-value">0%</span>
+        </div>
+        
+        <div class="control">
+            <label>Volume:</label>
+            <input type="range" id="volume" min="0" max="100" value="70" step="1">
+            <span class="value" id="volume-value">70%</span>
+        </div>
+    </div>
+    
+    <canvas id="visualizer"></canvas>
+    
+    <div class="info">
+        <h3>About Throat Singing Styles</h3>
+        <p><strong>Khoomei:</strong> The fundamental style with balanced overtones, producing a soft, airy sound.</p>
+        <p><strong>Sygyt:</strong> Emphasizes high, whistle-like overtones by constricting the throat and shaping the mouth cavity.</p>
+        <p><strong>Kargyraa:</strong> Features deep, growling tones with prominent subharmonics, created by vibrating the false vocal folds.</p>
+    </div>
+    
+    <script src="src/audio-engine.js"></script>
+    <script src="src/visualizer.js"></script>
+    <script src="src/controls.js"></script>
+</body>
+</html>

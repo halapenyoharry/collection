@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantum Life</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0908;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+    font-family: 'Courier New', monospace;
+  }
+  #panel {
+    width: 260px;
+    min-width: 260px;
+    padding: 14px;
+    background: #1a1714;
+    border-right: 1px solid #2a2418;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    overflow-y: auto;
+    color: #8a7a60;
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .cg { display: flex; flex-direction: column; gap: 2px; }
+  .cg label { color: #6a5a40; }
+  .cg input[type="range"] { width: 100%; accent-color: #6a5a40; }
+  .cg .v { text-align: right; color: #8a7a60; }
+  .cg select {
+    background: #1a1714;
+    color: #8a7a60;
+    border: 1px solid #2a2418;
+    font-family: inherit;
+    font-size: 10px;
+    padding: 3px;
+  }
+  button {
+    background: none;
+    border: 1px solid #2a2418;
+    color: #8a7a60;
+    font-family: inherit;
+    font-size: 10px;
+    letter-spacing: 1px;
+    padding: 6px 10px;
+    cursor: pointer;
+    text-transform: uppercase;
+  }
+  button:hover { border-color: #aa9a60; color: #aa9a60; }
+  button.primary { background: #2a2418; color: #c8b880; }
+  button.active { background: #3a3420; border-color: #c8b880; color: #c8b880; }
+  .row { display: flex; gap: 4px; flex-wrap: wrap; }
+  #wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0a0908;
+  }
+  canvas { image-rendering: pixelated; cursor: crosshair; }
+  #status { color: #5a4a38; font-size: 9px; min-height: 32px; line-height: 1.4; }
+  .sep { border-top: 1px solid #2a2418; margin: 3px 0; }
+  .note { color: #4a3a28; font-size: 9px; text-transform: none; letter-spacing: 0; line-height: 1.3; }
+</style>
+</head>
+<body>
+
+<div id="panel">
+  <div style="color:#c8b880; font-size:12px; letter-spacing:2px;">QUANTUM LIFE</div>
+  <div class="note">Each cell is a qubit: α|dead⟩ + β|alive⟩<br>Update is unitary. Observation collapses.</div>
+
+  <div class="cg">
+    <label>Grid</label>
+    <select id="gridSize">
+      <option value="64">64×64</option>
+      <option value="128" selected>128×128</option>
+      <option value="256">256×256</option>
+    </select>
+  </div>
+
+  <div class="cg">
+    <label>Speed (ms/step)</label>
+    <input type="range" id="speed" min="0" max="500" value="60" step="10">
+    <div class="v" id="speedVal">60</div>
+  </div>
+
+  <div class="sep"></div>
+
+  <div class="cg">
+    <label>Initial |alive⟩ probability</label>
+    <input type="range" id="initProb" min="1" max="80" value="20" step="1">
+    <div class="v" id="initProbVal">20%</div>
+  </div>
+
+  <div class="cg">
+    <label>Initial superposition</label>
+    <input type="range" id="initSuper" min="0" max="100" value="60" step="5">
+    <div class="v" id="initSuperVal">60%</div>
+  </div>
+
+  <div class="sep"></div>
+
+  <div class="cg">
+    <label>Hadamard mixing</label>
+    <input type="range" id="hadamard" min="0" max="100" value="30" step="1">
+    <div class="v" id="hadamardVal">30%</div>
+  </div>
+
+  <div class="cg">
+    <label>Phase evolution rate</label>
+    <input type="range" id="phaseRate" min="0" max="100" value="40" step="1">
+    <div class="v" id="phaseRateVal">40</div>
+  </div>
+
+  <div class="cg">
+    <label>Observation pressure</label>
+    <input type="range" id="observation" min="0" max="100" value="5" step="1">
+    <div class="v" id="observationVal">5%</div>
+  </div>
+
+  <div class="cg">
+    <label>Decoherence rate</label>
+    <input type="range" id="decoherence" min="0" max="100" value="2" step="1">
+    <div class="v" id="decoherenceVal">2%</div>
+  </div>
+
+  <div class="sep"></div>
+
+  <div class="cg">
+    <label>View mode</label>
+    <select id="viewMode">
+      <option value="probability" selected>|alive⟩ probability</option>
+      <option value="phase">Phase (hue)</option>
+      <option value="coherence">Coherence (superposition)</option>
+      <option value="entropy">Neighborhood entropy</option>
+      <option value="composite">Composite</option>
+    </select>
+  </div>
+
+  <div class="cg">
+    <label>Trails</label>
+    <select id="trails">
+      <option value="none">None</option>
+      <option value="fade" selected>Fade</option>
+    </select>
+  </div>
+
+  <div class="sep"></div>
+
+  <div class="row">
+    <button class="primary" id="playPause">Play</button>
+    <button id="step">Step</button>
+    <button id="clear">Clear</button>
+  </div>
+  <div class="row">
+    <button id="randomize">Randomize</button>
+    <button id="measure">Measure All</button>
+  </div>
+  <div class="row">
+    <button id="save">Save PNG</button>
+  </div>
+
+  <div class="sep"></div>
+  <label style="color:#6a5a40;">Presets</label>
+  <div class="row">
+    <button class="preset" data-p="qglider">Q-Glider</button>
+    <button class="preset" data-p="superpos">Superposition</button>
+  </div>
+  <div class="row">
+    <button class="preset" data-p="entangled">Entangled pair</button>
+    <button class="preset" data-p="rpent">Q-R-pentomino</button>
+  </div>
+  <div class="row">
+    <button class="preset" data-p="border">Border seeds</button>
+    <button class="preset" data-p="nucleus">Nucleus</button>
+  </div>
+
+  <div class="sep"></div>
+
+  <div class="cg">
+    <label>Seed #</label>
+    <input type="range" id="rngSeed" min="1" max="9999" value="42" step="1">
+    <div class="v" id="rngSeedVal">42</div>
+  </div>
+
+  <div id="status">Gen: 0 | Avg P(alive): 0 | Coherence: 0</div>
+</div>
+
+<div id="wrap">
+  <canvas id="c"></canvas>
+</div>
+
+<script>
+// ============================================================
+// QUANTUM CELLULAR AUTOMATON
+//
+// Each cell holds a qubit: ψ = α|0⟩ + β|1⟩
+//   where |0⟩ = dead, |1⟩ = alive
+//   α, β are complex: {re, im}
+//   |α|² + |β|² = 1
+//
+// Update rule (per generation):
+//   1. Compute neighborhood "alive expectation" = sum of |β_j|² for 8 neighbors
+//   2. Apply a unitary rotation inspired by Conway's rules:
+//      - If neighbor expectation ≈ 3: rotate toward |alive⟩
+//      - If neighbor expectation ≈ 2: preserve current state
+//      - Otherwise: rotate toward |dead⟩
+//   3. Apply Hadamard-like mixing (creates superposition)
+//   4. Phase evolution based on neighborhood
+//   5. Partial measurement (observation) with some probability
+//   6. Environmental decoherence (shrinks off-diagonal terms)
+// ============================================================
+
+function mulberry32(a) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    var t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  }
+}
+
+let rng;
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+let N = 128;
+// State: each cell has α (dead amplitude) and β (alive amplitude), both complex
+// Stored as flat arrays for performance
+let alphaRe, alphaIm, betaRe, betaIm;
+let nAlphaRe, nAlphaIm, nBetaRe, nBetaIm; // next state
+let trailGrid;
+let generation = 0;
+let running = false;
+
+function initGrids() {
+  const sz = N * N;
+  alphaRe = new Float32Array(sz); alphaIm = new Float32Array(sz);
+  betaRe = new Float32Array(sz);  betaIm = new Float32Array(sz);
+  nAlphaRe = new Float32Array(sz); nAlphaIm = new Float32Array(sz);
+  nBetaRe = new Float32Array(sz);  nBetaIm = new Float32Array(sz);
+  trailGrid = new Float32Array(sz);
+  generation = 0;
+
+  // Default: all |dead⟩
+  for (let i = 0; i < sz; i++) {
+    alphaRe[i] = 1; alphaIm[i] = 0;
+    betaRe[i] = 0;  betaIm[i] = 0;
+  }
+}
+
+// Complex magnitude squared
+function mag2(re, im) { return re * re + im * im; }
+
+// Normalize a qubit
+function normalize(i) {
+  const norm = Math.sqrt(mag2(alphaRe[i], alphaIm[i]) + mag2(betaRe[i], betaIm[i]));
+  if (norm < 1e-10) { alphaRe[i] = 1; alphaIm[i] = 0; betaRe[i] = 0; betaIm[i] = 0; return; }
+  const inv = 1 / norm;
+  alphaRe[i] *= inv; alphaIm[i] *= inv;
+  betaRe[i] *= inv;  betaIm[i] *= inv;
+}
+
+function normalizeN(i) {
+  const norm = Math.sqrt(mag2(nAlphaRe[i], nAlphaIm[i]) + mag2(nBetaRe[i], nBetaIm[i]));
+  if (norm < 1e-10) { nAlphaRe[i] = 1; nAlphaIm[i] = 0; nBetaRe[i] = 0; nBetaIm[i] = 0; return; }
+  const inv = 1 / norm;
+  nAlphaRe[i] *= inv; nAlphaIm[i] *= inv;
+  nBetaRe[i] *= inv;  nBetaIm[i] *= inv;
+}
+
+// Wrap coordinates
+function idx(x, y) {
+  x = ((x % N) + N) % N;
+  y = ((y % N) + N) % N;
+  return y * N + x;
+}
+
+function getParams() {
+  return {
+    hadamard: +document.getElementById('hadamard').value / 100,
+    phaseRate: +document.getElementById('phaseRate').value / 100,
+    observation: +document.getElementById('observation').value / 100,
+    decoherence: +document.getElementById('decoherence').value / 100,
+  };
+}
+
+function step() {
+  const p = getParams();
+  const sz = N * N;
+
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      const i = y * N + x;
+
+      // 1. Compute neighborhood alive expectation (sum of P(alive) for 8 neighbors)
+      let neighborExp = 0;
+      let neighborPhaseRe = 0, neighborPhaseIm = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const j = idx(x + dx, y + dy);
+          neighborExp += mag2(betaRe[j], betaIm[j]);
+          // Accumulate neighbor phase for interference
+          neighborPhaseRe += betaRe[j];
+          neighborPhaseIm += betaIm[j];
+        }
+      }
+
+      // Current state
+      let aRe = alphaRe[i], aIm = alphaIm[i];
+      let bRe = betaRe[i], bIm = betaIm[i];
+      const pAlive = mag2(bRe, bIm);
+
+      // 2. Conway-inspired unitary rotation
+      // Rotation angle depends on how close neighborExp is to birth/survival values
+      // Birth: neighborExp ≈ 3 rotates dead→alive
+      // Survival: neighborExp ≈ 2-3 and already alive → stay
+      // Death: otherwise → rotate alive→dead
+
+      // Smooth Conway: compute a "fitness" for being alive
+      // Peak at 3 (birth), plateau at 2-3 (survival), drops off elsewhere
+      const birth = Math.exp(-0.5 * Math.pow(neighborExp - 3, 2) / 0.5);
+      const survive = Math.exp(-0.5 * Math.pow(neighborExp - 2.5, 2) / 1.0);
+      const fitness = Math.max(birth, survive * pAlive);
+
+      // Rotation angle: positive rotates toward |alive⟩, negative toward |dead⟩
+      const targetAlive = fitness;
+      const currentAlive = pAlive;
+      const rotAngle = (targetAlive - currentAlive) * Math.PI * 0.3;
+
+      // Apply Ry(θ) rotation: |ψ⟩ → cos(θ/2)|ψ⟩ + sin(θ/2) rotation
+      const cosR = Math.cos(rotAngle);
+      const sinR = Math.sin(rotAngle);
+      let newARe = cosR * aRe - sinR * bRe;
+      let newAIm = cosR * aIm - sinR * bIm;
+      let newBRe = sinR * aRe + cosR * bRe;
+      let newBIm = sinR * aIm + cosR * bIm;
+
+      // 3. Hadamard-like mixing (partial)
+      // Blend toward equal superposition slightly
+      if (p.hadamard > 0) {
+        const h = p.hadamard * 0.15; // scale down so it's subtle
+        const mixARe = (newARe + newBRe) * 0.7071;
+        const mixAIm = (newAIm + newBIm) * 0.7071;
+        const mixBRe = (newARe - newBRe) * 0.7071;
+        const mixBIm = (newAIm - newBIm) * 0.7071;
+        newARe = newARe * (1 - h) + mixARe * h;
+        newAIm = newAIm * (1 - h) + mixAIm * h;
+        newBRe = newBRe * (1 - h) + mixBRe * h;
+        newBIm = newBIm * (1 - h) + mixBIm * h;
+      }
+
+      // 4. Phase evolution from neighborhood interference
+      if (p.phaseRate > 0) {
+        const phaseKick = Math.atan2(neighborPhaseIm, neighborPhaseRe + 0.001) * p.phaseRate * 0.1;
+        const cosP = Math.cos(phaseKick);
+        const sinP = Math.sin(phaseKick);
+        const tmpBRe = newBRe * cosP - newBIm * sinP;
+        const tmpBIm = newBRe * sinP + newBIm * cosP;
+        newBRe = tmpBRe;
+        newBIm = tmpBIm;
+      }
+
+      nAlphaRe[i] = newARe; nAlphaIm[i] = newAIm;
+      nBetaRe[i] = newBRe;  nBetaIm[i] = newBIm;
+      normalizeN(i);
+    }
+  }
+
+  // Swap
+  let tmp;
+  tmp = alphaRe; alphaRe = nAlphaRe; nAlphaRe = tmp;
+  tmp = alphaIm; alphaIm = nAlphaIm; nAlphaIm = tmp;
+  tmp = betaRe; betaRe = nBetaRe; nBetaRe = tmp;
+  tmp = betaIm; betaIm = nBetaIm; nBetaIm = tmp;
+
+  // 5. Observation (partial measurement)
+  if (p.observation > 0) {
+    for (let i = 0; i < sz; i++) {
+      if (Math.random() < p.observation * 0.01) {
+        // Measure: collapse to |0⟩ or |1⟩
+        const pAlive = mag2(betaRe[i], betaIm[i]);
+        if (Math.random() < pAlive) {
+          // Collapse to |alive⟩
+          alphaRe[i] = 0; alphaIm[i] = 0;
+          betaRe[i] = 1; betaIm[i] = 0;
+        } else {
+          // Collapse to |dead⟩
+          alphaRe[i] = 1; alphaIm[i] = 0;
+          betaRe[i] = 0; betaIm[i] = 0;
+        }
+      }
+    }
+  }
+
+  // 6. Decoherence (phase damping — reduces off-diagonal coherence)
+  if (p.decoherence > 0) {
+    const damp = 1 - p.decoherence * 0.02;
+    for (let i = 0; i < sz; i++) {
+      // Dampen the imaginary parts (phase information leaks to environment)
+      alphaIm[i] *= damp;
+      betaIm[i] *= damp;
+      // Slight amplitude damping toward classical
+      const pA = mag2(alphaRe[i], alphaIm[i]);
+      const pB = mag2(betaRe[i], betaIm[i]);
+      // Push cross-terms toward zero (decoherence in density matrix sense)
+      // Approximate by slightly reducing the smaller amplitude
+      if (pA > 0.01 && pB > 0.01) {
+        const shrink = 1 - p.decoherence * 0.005;
+        if (pA < pB) {
+          alphaRe[i] *= shrink; alphaIm[i] *= shrink;
+        } else {
+          betaRe[i] *= shrink; betaIm[i] *= shrink;
+        }
+      }
+      normalize(i);
+    }
+  }
+
+  // Update trails
+  for (let i = 0; i < sz; i++) {
+    const pAlive = mag2(betaRe[i], betaIm[i]);
+    trailGrid[i] = Math.max(trailGrid[i] * 0.93, pAlive);
+  }
+
+  generation++;
+}
+
+// Measure all cells (full collapse)
+function measureAll() {
+  const sz = N * N;
+  for (let i = 0; i < sz; i++) {
+    const pAlive = mag2(betaRe[i], betaIm[i]);
+    if (Math.random() < pAlive) {
+      alphaRe[i] = 0; alphaIm[i] = 0;
+      betaRe[i] = 1; betaIm[i] = 0;
+    } else {
+      alphaRe[i] = 1; alphaIm[i] = 0;
+      betaRe[i] = 0; betaIm[i] = 0;
+    }
+  }
+}
+
+// ============================================================
+// RENDERING
+// ============================================================
+
+function hslToRgb(h, s, l) {
+  h = h % 360;
+  s /= 100; l /= 100;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+  const m = l - c / 2;
+  let r, g, b;
+  if (h < 60) { r = c; g = x; b = 0; }
+  else if (h < 120) { r = x; g = c; b = 0; }
+  else if (h < 180) { r = 0; g = c; b = x; }
+  else if (h < 240) { r = 0; g = x; b = c; }
+  else if (h < 300) { r = x; g = 0; b = c; }
+  else { r = c; g = 0; b = x; }
+  return [Math.floor((r + m) * 255), Math.floor((g + m) * 255), Math.floor((b + m) * 255)];
+}
+
+function render() {
+  canvas.width = N; canvas.height = N;
+  const viewMode = document.getElementById('viewMode').value;
+  const trailMode = document.getElementById('trails').value;
+  const imgData = ctx.createImageData(N, N);
+  const data = imgData.data;
+  const sz = N * N;
+
+  let totalP = 0, totalCoherence = 0;
+
+  for (let i = 0; i < sz; i++) {
+    const pAlive = mag2(betaRe[i], betaIm[i]);
+    const pDead = mag2(alphaRe[i], alphaIm[i]);
+    const phase = Math.atan2(betaIm[i], betaRe[i]); // -π to π
+    // Coherence: how far from classical? max when |α|²=|β|²=0.5
+    const coherence = 2 * Math.sqrt(pAlive * pDead);
+    const trail = trailGrid[i];
+
+    totalP += pAlive;
+    totalCoherence += coherence;
+
+    let r, g, b;
+    const pi = i * 4;
+
+    if (viewMode === 'probability') {
+      // Amber intensity by P(alive), with trail
+      const v = trailMode === 'fade' ? Math.max(pAlive, trail * 0.4) : pAlive;
+      r = Math.floor(v * 250);
+      g = Math.floor(v * 190);
+      b = Math.floor(v * 50);
+      // Tint toward blue for high coherence (superposition)
+      if (coherence > 0.3) {
+        const c = (coherence - 0.3) * 1.4;
+        b = Math.min(255, b + Math.floor(c * 150));
+        g = Math.min(255, g + Math.floor(c * 40));
+      }
+    } else if (viewMode === 'phase') {
+      // Hue = phase, brightness = P(alive)
+      const hue = (phase + Math.PI) / (2 * Math.PI) * 360;
+      const bright = pAlive;
+      [r, g, b] = hslToRgb(hue, 80, bright * 50);
+    } else if (viewMode === 'coherence') {
+      // How much superposition: bright = high coherence
+      const v = coherence;
+      r = Math.floor(v * 100);
+      g = Math.floor(v * 220);
+      b = Math.floor(v * 255);
+      // Add warmth for alive probability
+      if (pAlive > 0.5) {
+        r = Math.min(255, r + Math.floor((pAlive - 0.5) * 200));
+      }
+    } else if (viewMode === 'entropy') {
+      // Neighborhood entanglement entropy approximation
+      const x = i % N, y = (i / N) | 0;
+      let entropySum = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const j = idx(x + dx, y + dy);
+          const pj = mag2(betaRe[j], betaIm[j]);
+          if (pj > 0.001 && pj < 0.999) {
+            entropySum += -pj * Math.log2(pj) - (1 - pj) * Math.log2(1 - pj);
+          }
+        }
+      }
+      const ent = entropySum / 8; // normalize
+      r = Math.floor(ent * 255);
+      g = Math.floor(ent * 120);
+      b = Math.floor(ent * 60);
+    } else if (viewMode === 'composite') {
+      // Composite: brightness=P(alive), hue=phase, saturation=coherence
+      const hue = (phase + Math.PI) / (2 * Math.PI) * 360;
+      const sat = coherence * 100;
+      const light = Math.max(pAlive * 45, (trailMode === 'fade' ? trail * 12 : 0));
+      [r, g, b] = hslToRgb(hue, sat, light);
+    }
+
+    data[pi] = r;
+    data[pi + 1] = g;
+    data[pi + 2] = b;
+    data[pi + 3] = 255;
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+
+  const avgP = (totalP / sz).toFixed(3);
+  const avgC = (totalCoherence / sz).toFixed(3);
+  document.getElementById('status').textContent =
+    `Gen: ${generation} | ⟨P(alive)⟩: ${avgP} | ⟨Coherence⟩: ${avgC}`;
+}
+
+// ============================================================
+// PRESETS
+// ============================================================
+
+function setQubit(x, y, pAlive, phase) {
+  const i = idx(x, y);
+  const sqrtP = Math.sqrt(Math.max(0, Math.min(1, pAlive)));
+  const sqrtD = Math.sqrt(1 - sqrtP * sqrtP);
+  alphaRe[i] = sqrtD;
+  alphaIm[i] = 0;
+  betaRe[i] = sqrtP * Math.cos(phase || 0);
+  betaIm[i] = sqrtP * Math.sin(phase || 0);
+}
+
+function placePreset(name) {
+  const cx = Math.floor(N / 2);
+  const cy = Math.floor(N / 2);
+
+  if (name === 'qglider') {
+    // Classical glider but cells in partial superposition
+    const pts = [[1,0],[2,1],[0,2],[1,2],[2,2]];
+    for (const [dx, dy] of pts) {
+      setQubit(cx + dx, cy + dy, 0.9, 0);
+    }
+    // Surround with light superposition halo
+    for (let dy = -2; dy <= 4; dy++) {
+      for (let dx = -2; dx <= 4; dx++) {
+        const i = idx(cx + dx, cy + dy);
+        if (mag2(betaRe[i], betaIm[i]) < 0.1) {
+          setQubit(cx + dx, cy + dy, 0.15, Math.random() * Math.PI * 2);
+        }
+      }
+    }
+  } else if (name === 'superpos') {
+    // A block of cells all in equal superposition
+    for (let dy = -5; dy <= 5; dy++) {
+      for (let dx = -5; dx <= 5; dx++) {
+        const phase = (dx * 0.5 + dy * 0.3); // phase gradient
+        setQubit(cx + dx, cy + dy, 0.5, phase);
+      }
+    }
+  } else if (name === 'entangled') {
+    // Two clusters with correlated phases
+    for (let dy = -3; dy <= 3; dy++) {
+      for (let dx = -3; dx <= 3; dx++) {
+        const phase = Math.atan2(dy, dx);
+        setQubit(cx - 15 + dx, cy + dy, 0.7, phase);
+        setQubit(cx + 15 + dx, cy + dy, 0.7, -phase); // anti-correlated
+      }
+    }
+  } else if (name === 'rpent') {
+    // R-pentomino in superposition
+    const pts = [[1,0],[2,0],[0,1],[1,1],[1,2]];
+    for (const [dx, dy] of pts) {
+      setQubit(cx + dx, cy + dy, 0.85, rng() * Math.PI);
+    }
+    // Quantum haze around it
+    for (let dy = -4; dy <= 6; dy++) {
+      for (let dx = -4; dx <= 6; dx++) {
+        const i = idx(cx + dx, cy + dy);
+        if (mag2(betaRe[i], betaIm[i]) < 0.1) {
+          setQubit(cx + dx, cy + dy, 0.08, rng() * Math.PI * 2);
+        }
+      }
+    }
+  } else if (name === 'border') {
+    // Seeds along the edges in superposition
+    for (let k = 0; k < N; k += 3) {
+      const phase = k * 0.1;
+      setQubit(k, 0, 0.6, phase);
+      setQubit(k, N-1, 0.6, -phase);
+      setQubit(0, k, 0.6, phase * 0.7);
+      setQubit(N-1, k, 0.6, -phase * 0.7);
+    }
+  } else if (name === 'nucleus') {
+    // Dense center with radial phase gradient
+    for (let dy = -12; dy <= 12; dy++) {
+      for (let dx = -12; dx <= 12; dx++) {
+        const dist = Math.hypot(dx, dy);
+        if (dist > 12) continue;
+        const pAlive = 0.8 * (1 - dist / 14);
+        const phase = Math.atan2(dy, dx) * 2; // angular momentum
+        setQubit(cx + dx, cy + dy, pAlive, phase);
+      }
+    }
+  }
+}
+
+// ============================================================
+// INTERACTION
+// ============================================================
+
+let drawing = false;
+
+function canvasPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: Math.floor((e.clientX - rect.left) * N / rect.width),
+    y: Math.floor((e.clientY - rect.top) * N / rect.height),
+  };
+}
+
+canvas.addEventListener('mousedown', (e) => {
+  drawing = true;
+  const {x, y} = canvasPos(e);
+  // Toggle: if mostly alive, kill. if mostly dead, enliven in superposition
+  const i = idx(x, y);
+  const pAlive = mag2(betaRe[i], betaIm[i]);
+  if (pAlive > 0.4) {
+    setQubit(x, y, 0, 0);
+  } else {
+    setQubit(x, y, 0.7, Math.random() * Math.PI * 2);
+  }
+  if (!running) render();
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  if (!drawing) return;
+  const {x, y} = canvasPos(e);
+  setQubit(x, y, 0.7, Math.random() * Math.PI * 2);
+  setQubit(x+1, y, 0.5, Math.random() * Math.PI * 2);
+  setQubit(x, y+1, 0.5, Math.random() * Math.PI * 2);
+  if (!running) render();
+});
+
+canvas.addEventListener('mouseup', () => { drawing = false; });
+canvas.addEventListener('mouseleave', () => { drawing = false; });
+
+// ============================================================
+// CONTROLS
+// ============================================================
+
+function toggleRun() {
+  running = !running;
+  document.getElementById('playPause').textContent = running ? 'Pause' : 'Play';
+  document.getElementById('playPause').classList.toggle('active', running);
+  if (running) tick();
+}
+
+function tick() {
+  if (!running) return;
+  step();
+  render();
+  const speed = +document.getElementById('speed').value;
+  if (speed === 0) requestAnimationFrame(tick);
+  else setTimeout(tick, speed);
+}
+
+document.getElementById('playPause').addEventListener('click', toggleRun);
+document.getElementById('step').addEventListener('click', () => { step(); render(); });
+
+document.getElementById('clear').addEventListener('click', () => {
+  running = false;
+  document.getElementById('playPause').textContent = 'Play';
+  document.getElementById('playPause').classList.remove('active');
+  initGrids();
+  render();
+});
+
+document.getElementById('randomize').addEventListener('click', () => {
+  rng = mulberry32(+document.getElementById('rngSeed').value);
+  const initProb = +document.getElementById('initProb').value / 100;
+  const initSuper = +document.getElementById('initSuper').value / 100;
+  initGrids();
+  const sz = N * N;
+  for (let i = 0; i < sz; i++) {
+    const p = rng() < initProb ? (initSuper > 0 ? 0.3 + rng() * 0.7 : 1) : (initSuper > 0 ? rng() * 0.15 : 0);
+    const phase = rng() * Math.PI * 2;
+    const sqrtP = Math.sqrt(p);
+    const sqrtD = Math.sqrt(1 - p);
+    alphaRe[i] = sqrtD; alphaIm[i] = 0;
+    betaRe[i] = sqrtP * Math.cos(phase);
+    betaIm[i] = sqrtP * Math.sin(phase);
+  }
+  generation = 0;
+  render();
+});
+
+document.getElementById('measure').addEventListener('click', () => {
+  measureAll();
+  render();
+});
+
+document.getElementById('gridSize').addEventListener('change', () => {
+  N = +document.getElementById('gridSize').value;
+  running = false;
+  document.getElementById('playPause').textContent = 'Play';
+  document.getElementById('playPause').classList.remove('active');
+  initGrids();
+  render();
+});
+
+document.querySelectorAll('.preset').forEach(btn => {
+  btn.addEventListener('click', () => {
+    rng = mulberry32(+document.getElementById('rngSeed').value);
+    initGrids();
+    placePreset(btn.dataset.p);
+    render();
+  });
+});
+
+['speed','initProb','initSuper','hadamard','phaseRate','observation','decoherence','rngSeed'].forEach(id => {
+  const el = document.getElementById(id);
+  const val = document.getElementById(id + 'Val');
+  el.addEventListener('input', () => {
+    let v = el.value;
+    if (id === 'initProb' || id === 'initSuper' || id === 'hadamard' || id === 'observation' || id === 'decoherence') v += '%';
+    val.textContent = v;
+  });
+});
+
+document.getElementById('save').addEventListener('click', () => {
+  const link = document.createElement('a');
+  link.download = 'quantum_life.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+});
+
+function fitCanvas() {
+  const wrap = document.getElementById('wrap');
+  const size = Math.min(wrap.clientWidth - 32, wrap.clientHeight - 32);
+  canvas.style.width = size + 'px';
+  canvas.style.height = size + 'px';
+}
+window.addEventListener('resize', fitCanvas);
+
+// Init
+rng = mulberry32(42);
+initGrids();
+render();
+fitCanvas();
+</script>
+</body>
+</html>

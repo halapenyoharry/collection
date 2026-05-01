@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MedCurvez v3 — AUC-Preserving Gastric Delay</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap');
+:root{--bg:#0a0a0f;--surface:#12121a;--surface2:#1a1a26;--border:#2a2a3a;--text:#e0e0e8;--text-dim:#7a7a8e;--accent:#00d4aa;--tirz:#ff6b35;--mph:#00d4aa;--fluo:#7b68ee;--vals:#ff4757;--hctz:#ff6b81;--bet:#ffd32a;--tyro:#0abde3;--biot:#a29bfe;--iron:#e17055;--om3:#00cec9;--vd:#fdcb6e}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-serif;font-size:14px}
+.app{display:grid;grid-template-columns:320px 1fr;grid-template-rows:auto 1fr;min-height:100vh}
+header{grid-column:1/-1;padding:16px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;background:var(--surface);flex-wrap:wrap}
+header h1{font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:600;color:var(--accent);letter-spacing:1px}
+header .sub{font-size:11px;color:var(--text-dim)}
+.gtog{margin-left:auto;display:flex;align-items:center;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);cursor:pointer;padding:4px 12px;border:1px solid var(--border);border-radius:4px;transition:all .2s;user-select:none}
+.gtog.on{border-color:var(--tirz);color:var(--tirz);background:rgba(255,107,53,.08)}
+.gtog .dot{width:8px;height:8px;border-radius:50%;background:var(--border);transition:all .2s}
+.gtog.on .dot{background:var(--tirz);box-shadow:0 0 6px var(--tirz)}
+.side{background:var(--surface);border-right:1px solid var(--border);padding:12px;overflow-y:auto;max-height:calc(100vh - 52px)}
+.side h2{font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--text-dim);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.mg{margin-bottom:4px;border:1px solid var(--border);border-radius:5px;overflow:hidden}
+.mg:hover{border-color:var(--text-dim)}
+.mh{display:flex;align-items:center;gap:6px;padding:6px 8px;cursor:pointer;background:var(--surface2);user-select:none}.mh .cd{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.mh .nm{font-size:11px;font-weight:500;flex:1}
+.mh .tg{width:28px;height:16px;border-radius:8px;background:var(--border);position:relative;transition:background .2s;flex-shrink:0}
+.mh .tg.on{background:var(--accent)}
+.mh .tg::after{content:'';position:absolute;width:12px;height:12px;border-radius:50%;background:#fff;top:2px;left:2px;transition:left .2s}
+.mh .tg.on::after{left:14px}
+.md{padding:6px 8px;display:none;border-top:1px solid var(--border)}
+.md.open{display:block}
+.md label{display:block;font-size:10px;color:var(--text-dim);margin-bottom:2px;font-family:'IBM Plex Mono',monospace}
+.md input[type="time"]{width:100%;padding:3px 5px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:11px;margin-bottom:6px}
+.md .pk{font-size:9px;color:var(--text-dim);line-height:1.5;padding:5px;background:var(--bg);border-radius:3px;font-family:'IBM Plex Mono',monospace;white-space:pre-line}
+.vc{padding:10px 0;border-top:1px solid var(--border);margin-top:10px}
+.vc label{font-size:10px;color:var(--text-dim);font-family:'IBM Plex Mono',monospace;display:block;margin-bottom:3px}
+.vc select,.vc input{width:100%;padding:4px 6px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:11px;margin-bottom:8px}
+.main{padding:16px;overflow:auto}
+.cc{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:16px;margin-bottom:12px}
+.ct{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px}
+canvas{width:100%;display:block}
+.ip{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:16px}
+.ip h3{font-family:'IBM Plex Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent);margin-bottom:10px}
+.ins{padding:8px 10px;background:var(--surface2);border-left:3px solid var(--accent);border-radius:0 3px 3px 0;margin-bottom:6px;font-size:11px;line-height:1.6}
+.ins .w{color:var(--tirz)}
+.ins .g{color:var(--accent)}
+.leg{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+.li{display:flex;align-items:center;gap:5px;font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--text-dim)}
+.li .sw{width:14px;height:2px;border-radius:1px}
+.li .gw{width:14px;height:2px;opacity:.3;border:1px dashed}
+.tt{position:fixed;background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:8px 12px;font-size:10px;font-family:'IBM Plex Mono',monospace;pointer-events:none;z-index:100;display:none;max-width:280px;line-height:1.5;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+.tt .gd{margin-top:4px;padding:3px 0;border-top:1px solid var(--border);font-size:9px;color:var(--tirz)}
+.method-note{font-size:9px;color:var(--text-dim);font-family:'IBM Plex Mono',monospace;margin-top:6px;padding:6px 8px;background:var(--bg);border-radius:3px;line-height:1.5}
+</style>
+</head>
+<body><div class="app">
+  <header>
+    <h1>MEDCURVEZ</h1>
+    <span class="sub">v3 — AUC-Preserving Gastric Delay</span>
+    <div class="gtog on" id="gTog"><span class="dot"></span><span>GLP-1 Gastric Delay</span></div>
+  </header>
+  <div class="side">
+    <h2>Substances</h2>
+    <div id="ml"></div>
+    <div class="vc">
+      <h2>View</h2>
+      <label>Time Window</label>
+      <select id="vw">
+        <option value="24">Single Day (24h)</option>
+        <option value="168" selected>Single Week (168h)</option>
+        <option value="672">Full Month (672h)</option>
+      </select>
+      <label>Start Day</label>
+      <input type="range" id="doff" min="0" max="21" value="0" step="1">
+      <div id="dl" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text-dim)"></div>
+      <div class="method-note">
+        <strong>Method:</strong> Gastric delay stretches the absorption rate constant (ka) rather than artificially scaling Cmax. When the stomach empties slower, the drug trickles into the intestine over a longer period. The peak drops naturally because the curve widens. Total AUC is preserved — same drug gets absorbed, just spread across more time. This matches the GPGA study finding: Cmax ↓50%, AUC unchanged, Tmax delayed.
+      </div>
+    </div>
+  </div>
+  <div class="main">
+    <div class="cc">
+      <div class="ct">Plasma Concentration — <span id="ds" style="color:var(--tirz)">Gastric delay ON</span></div>
+      <div class="leg" id="leg"></div>
+      <canvas id="mc" style="height:420px"></canvas>
+    </div>
+    <div class="cc">
+      <div class="ct">Gastric Environment</div>
+      <canvas id="gc" style="height:200px"></canvas>
+    </div>
+    <div class="ip">
+      <h3>Interaction Insights</h3>
+      <div id="ins"></div>
+    </div>
+  </div>
+</div>
+<div class="tt" id="tt"></div>
+<script>
+/*
+  CORE PHYSICS: AUC-PRESERVING GASTRIC DELAY
+  A one-compartment oral PK model: C(t) = (F·D·ka)/(Vd·(ka-ke)) · (e^(-ke·t) - e^(-ka·t))
+  AUC = (F·D)/(Vd·ke) — ka cancels out. AUC does NOT depend on absorption rate.
+  Tirzepatide slows gastric emptying → slows ka → curve widens, peak drops, AUC preserved.
+  GPGA study: Cmax dropped 50%, AUC unchanged, Tmax delayed ~1h.
+*/
+function getTirzFrac(absHour) {
+  const cycleH = absHour % 168;
+  const ka = Math.log(2) / 18, ke = Math.log(2) / 120;
+  const c = Math.exp(-ke * cycleH) - Math.exp(-ka * cycleH);
+  const tpeak = Math.log(ka/ke) / (ka - ke);
+  const cpeak = Math.exp(-ke * tpeak) - Math.exp(-ka * tpeak);
+  return Math.min(1, Math.max(0, c / Math.abs(cpeak)));
+}
+
+function getKaStretch(absHour) {
+  const frac = getTirzFrac(absHour);
+  const wk = Math.min(3, Math.floor(absHour / 168));
+  const peakStretch = 6 - 2 * (wk / 3);
+  const troughStretch = 1.2;
+  const stretch = troughStretch + (peakStretch - troughStretch) * frac;
+  const betWinMin = 77 * stretch / 1.2;
+  return { stretch, frac, betWinH: Math.min(betWinMin, 200) / 60, wk };
+}
+
+function oneCompartment(t, ka, ke) {
+  if (t <= 0) return 0;
+  if (Math.abs(ka - ke) < 0.001) return ka * t * Math.exp(-ke * t);
+  const A = (ka * ke) / (ka - ke);
+  return Math.max(0, A * (Math.exp(-ke * t) - Math.exp(-ka * t)));
+}
+
+const tH = s => { const [h,m] = s.split(':').map(Number); return h + m/60; };
+
+const meds = [
+  { id:'tirz', name:'Tirzepatide 10mg', color:'#ff6b35', on:true, time:'08:00', freq:'weekly', route:'sc', ka: Math.log(2)/18, ke: Math.log(2)/120, accum: 1.65, info:'t½=120h | SC — not gastric-modulated\nSource of GLP-1 gastric delay' },
+  { id:'mph', name:'Methylphenidate ER', color:'#00d4aa', on:true, time:'07:00', freq:'daily', route:'oral', bimodal: true, ka1: Math.log(2)/0.8, ke1: Math.log(2)/3.5, ka2: Math.log(2)/1.2, ke2: Math.log(2)/3.5, delay2: 3.5, ratio: [0.5, 0.5], acidSens: true, acidLoss: 0.25, info:'Bimodal ER: two bead populations\nka stretched → peaks blur\n⚠ Acid hydrolysis in betaine trap' },
+  { id:'fluo', name:'Fluoxetine 40mg', color:'#7b68ee', on:true, time:'07:00', freq:'daily', route:'oral', ka: Math.log(2)/3, ke: Math.log(2)/120, ssFloor: 0.85, info:'t½=4-6d | Steady state: flat\n⚠ D2R downregulation 45-52%' },
+  { id:'vals', name:'Valsartan 160mg', color:'#ff4757', on:true, time:'07:00', freq:'daily', route:'oral', ka: Math.log(2)/1.2, ke: Math.log(2)/7.5, acidSens: true, acidLoss: 0.40, info:'t½=6-9h | Bioavail=25%\n⚠ Precipitates at pH<2' },
+  { id:'hctz', name:'HCTZ 25mg', color:'#ff6b81', on:true, time:'07:00', freq:'daily', route:'oral', ka: Math.log(2)/0.8, ke: Math.log(2)/10, info:'t½=5-15h | Tmax=2h' },
+  { id:'bet', name:'Betaine HCl 1500mg', color:'#ffd32a', on:true, time:'07:00', freq:'daily', route:'oral', isBet: true, info:'pH→0.6 in 6.3min | Window stretches w/ delay\n⚠ Destroys MPH, precipitates valsartan\n✓ Optimizes iron' },
+  { id:'tyro', name:'L-Tyrosine 500mg', color:'#0abde3', on:true, time:'06:30', freq:'daily', route:'oral', ka: Math.log(2)/1.0, ke: Math.log(2)/3, info:'Tmax=2-3h | DA precursor' },
+  { id:'biot', name:'Biotin 10000mcg', color:'#a29bfe', on:true, time:'07:00', freq:'daily', route:'oral', ka: Math.log(2)/0.4, ke: Math.log(2)/2.5, info:'Tmax=1h | ~100% via SMVT\n⚠ Interferes w/ immunoassays' },
+  { id:'iron', name:'Iron 65mg', color:'#e17055', on:true, time:'07:00', freq:'daily', route:'oral', ka: Math.log(2)/2.0, ke: Math.log(2)/8, acidBen: true, acidBoost: 0.30, info:'Tmax=4h | ✓ Hyper-absorbs in acid' },
+  { id:'om3', name:'Omega-3 1200mg', color:'#00cec9', on:true, time:'07:00', freq:'daily', route:'oral', ka: Math.log(2)/3, ke: Math.log(2)/55, ssFloor: 0.7, info:'EPA t½=45h | DHA t½=66h' },
+  { id:'vd', name:'Vitamin D3 5000IU', color:'#fdcb6e', on:true, time:'07:00', freq:'daily', route:'oral', ka: Math.log(2)/6, ke: Math.log(2)/480, ssFloor: 0.95, info:'25(OH)D t½=20d | Immune to daily GI variation' }
+];
+let gOn = true;
+
+function evalMed(med, absH) {
+  let v = 0;
+  if (med.freq === 'weekly') {
+    for (let d = 0; d < 4; d++) { const dt = absH - (d * 168 + tH(med.time)); if (dt > 0 && dt < 336) v += oneCompartment(dt, med.ka, med.ke) * med.accum; }
+    return v;
+  }
+  const doseH = tH(med.time);
+  for (let day = 0; day < 28; day++) {
+    const dT = day * 24 + doseH, dt = absH - dT;
+    if (dt < 0 || dt > 48) continue;
+    const g = (gOn && med.route === 'oral') ? getKaStretch(dT) : { stretch: 1, frac: 0, betWinH: 1.28 };
+    if (med.isBet) { const w = g.betWinH; if (dt < w + 1.5) { v += Math.max(0, Math.exp(-dt / 0.3) + (dt < w ? 0.6 : 0) + (dt >= w ? 0.6 * Math.exp(-(dt - w) / 0.5) : 0)); } continue; }
+    if (med.ssFloor && med.ssFloor > 0.6) { const ka_mod = med.ka / g.stretch; const daily = oneCompartment(dt, ka_mod, med.ke); v += med.ssFloor + (daily - med.ssFloor) * 0.3; continue; }
+    if (med.bimodal) {
+      const ka1_mod = med.ka1 / g.stretch, ka2_mod = med.ka2 / g.stretch;
+      const v1 = oneCompartment(dt, ka1_mod, med.ke1) * med.ratio[0];
+      const dt2 = dt - med.delay2;
+      const v2 = dt2 > 0 ? oneCompartment(dt2, ka2_mod, med.ke2) * med.ratio[1] : 0;
+      let val = v1 + v2;
+      const betM = meds.find(m => m.id === 'bet');
+      if (betM && betM.on && med.acidSens) { const bT = day * 24 + tH(betM.time), tsb = absH - bT; if (tsb >= 0 && tsb < g.betWinH) val *= (1 - med.acidLoss * g.frac); }
+      v += val;
+    } else {
+      const ka_mod = med.ka / g.stretch;
+      let val = oneCompartment(dt, ka_mod, med.ke);
+      const betM = meds.find(m => m.id === 'bet');
+      if (betM && betM.on) { const bT = day * 24 + tH(betM.time), tsb = absH - bT; if (tsb >= 0 && tsb < g.betWinH) { if (med.acidSens) val *= (1 - (med.acidLoss || 0) * g.frac); if (med.acidBen) val *= (1 + (med.acidBoost || 0) * g.frac); } }
+      v += val;
+    }
+  }
+  return v;
+}
+
+const $ = id => document.getElementById(id);
+const mcC = $('mc'), gcC = $('gc');
+const mcX = mcC.getContext('2d'), gcX = gcC.getContext('2d');
+function buildSidebar() {
+  const el = $('ml'); el.innerHTML = '';
+  meds.forEach((m, i) => {
+    const g = document.createElement('div'); g.className = 'mg';
+    g.innerHTML = `<div class="mh" data-i="${i}"><span class="cd" style="background:${m.color}"></span><span class="nm">${m.name}</span><span class="tg ${m.on?'on':''}" data-t="${i}"></span></div><div class="md" id="d${i}"><label>Dose Time</label><input type="time" value="${m.time}" data-ti="${i}"><div class="pk">${m.info}</div></div>`;
+    el.appendChild(g);
+  });
+  document.querySelectorAll('.mh').forEach(h => h.addEventListener('click', e => {
+    const tg = e.target.closest('.tg');
+    if (tg) { const i = +tg.dataset.t; meds[i].on = !meds[i].on; tg.classList.toggle('on'); render(); return; }
+    $('d' + h.dataset.i).classList.toggle('open');
+  }));
+  document.querySelectorAll('input[type="time"]').forEach(inp => inp.addEventListener('change', e => { meds[+e.target.dataset.ti].time = e.target.value; render(); }));
+}
+
+function rz(c) {
+  const r = c.parentElement.getBoundingClientRect(), d = devicePixelRatio || 1;
+  const w = r.width - 32, h = +c.style.height.replace('px', '');
+  c.width = w * d; c.height = h * d; c.style.width = w + 'px';
+  c.getContext('2d').setTransform(d, 0, 0, d, 0, 0);
+  return { w, h };
+}
+
+function render() {
+  const wH = +$('vw').value, dO = +$('doff').value, sH = dO * 24, dP = dO % 7;
+  $('dl').textContent = `Day ${dO+1} — ${dP === 0 ? '💉 Injection Day' : dP + 'd post-injection'}`;
+  $('ds').textContent = gOn ? 'Gastric delay ON' : 'Gastric delay OFF';
+  $('ds').style.color = gOn ? 'var(--tirz)' : 'var(--text-dim)';
+  renderMain(sH, wH); renderGastric(sH, wH); renderLeg(); renderIns(dO);
+}
+function renderMain(sH, wH) {
+  const { w, h } = rz(mcC), ctx = mcX;
+  const p = { t: 20, r: 16, b: 36, l: 46 }, cw = w - p.l - p.r, ch = h - p.t - p.b;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = 'rgba(255,107,53,.04)';
+  for (let d = 0; d < 28; d++) if (d % 7 === 0) { const s = d*24 - sH, e = s + 24; if (e > 0 && s < wH) ctx.fillRect(p.l + Math.max(0, s/wH) * cw, p.t, (Math.min(wH, e) - Math.max(0, s)) / wH * cw, ch); }
+  const hpl = wH <= 24 ? 2 : wH <= 168 ? 12 : 24;
+  ctx.font = '9px IBM Plex Mono'; ctx.textAlign = 'center';
+  for (let t = 0; t <= wH; t += hpl) {
+    const x = p.l + (t/wH) * cw;
+    ctx.strokeStyle = '#1a1a26'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, p.t); ctx.lineTo(x, p.t + ch); ctx.stroke();
+    ctx.fillStyle = '#4a4a5e'; const aH = sH + t, dn = Math.floor(aH/24) + 1, hd = aH % 24;
+    if (wH <= 24) ctx.fillText(String(Math.floor(hd)).padStart(2,'0') + ':00', x, h - 8);
+    else if (wH <= 168) { if (hd === 0 || t === 0) ctx.fillText('D' + dn, x, h - 8); }
+    else { if (hd === 0 && dn % 7 === 1) ctx.fillText('Wk' + Math.ceil(dn/7), x, h - 8); }
+  }
+  for (let i = 0; i <= 4; i++) { const y = p.t + (i/4) * ch; ctx.strokeStyle = '#1a1a26'; ctx.beginPath(); ctx.moveTo(p.l, y); ctx.lineTo(p.l + cw, y); ctx.stroke(); ctx.fillStyle = '#4a4a5e'; ctx.textAlign = 'right'; ctx.fillText((100 - i*25) + '%', p.l - 6, y + 3); }
+  const step = wH <= 24 ? 0.2 : wH <= 168 ? 0.5 : 1;
+  meds.filter(m => m.on).forEach(med => {
+    let mx = 0; const pts = [];
+    for (let t = 0; t <= wH; t += step) { const v = evalMed(med, sH + t); pts.push({ t, v }); if (v > mx) mx = v; }
+    if (mx === 0) return;
+    if (gOn && med.route === 'oral' && !med.isBet && !(med.ssFloor > 0.6)) {
+      const was = gOn; gOn = false; let gmx = 0; const gp = [];
+      for (let t = 0; t <= wH; t += step) { const v = evalMed(med, sH + t); gp.push({ t, v }); if (v > gmx) gmx = v; }
+      const nf = Math.max(mx, gmx); mx = nf;
+      ctx.strokeStyle = med.color; ctx.lineWidth = 1; ctx.globalAlpha = 0.18; ctx.setLineDash([3, 3]); ctx.beginPath();
+      gp.forEach((q, i) => { const x = p.l + (q.t/wH) * cw, y = p.t + ch - (q.v/nf) * ch; i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
+      ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; gOn = was;
+    }
+    ctx.strokeStyle = med.color; ctx.lineWidth = 1.8; ctx.globalAlpha = 0.85; ctx.beginPath();
+    pts.forEach((q, i) => { const x = p.l + (q.t/wH) * cw, y = p.t + ch - (q.v/mx) * ch; i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
+    ctx.stroke(); ctx.globalAlpha = 0.05; ctx.fillStyle = med.color; ctx.lineTo(p.l + cw, p.t + ch); ctx.lineTo(p.l, p.t + ch); ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1;
+  });
+  ctx.save(); ctx.fillStyle = '#4a4a5e'; ctx.font = '9px IBM Plex Mono'; ctx.textAlign = 'center'; ctx.translate(10, p.t + ch/2); ctx.rotate(-Math.PI/2); ctx.fillText('Normalized Concentration (AUC-preserved)', 0, 0); ctx.restore();
+}
+function renderGastric(sH, wH) {
+  const { w, h } = rz(gcC), ctx = gcX;
+  const p = { t: 8, r: 16, b: 24, l: 46 }, cw = w - p.l - p.r, ch = h - p.t - p.b;
+  ctx.clearRect(0, 0, w, h);
+  const hH = ch * 0.42, gap = ch * 0.16, bH = ch * 0.42, tY = p.t, bY = p.t + hH + gap;
+  ctx.fillStyle = 'rgba(255,107,53,.03)'; ctx.fillRect(p.l, tY, cw, hH);
+  ctx.fillStyle = '#4a4a5e'; ctx.font = '8px IBM Plex Mono';
+  ctx.textAlign = 'right'; ctx.fillText('6x', p.l - 4, tY + 8); ctx.fillText('1x', p.l - 4, tY + hH - 2);
+  ctx.textAlign = 'left'; ctx.fillText('ka STRETCH (absorption slowdown)', p.l + 4, tY + 8);
+  if (meds.find(m => m.id === 'tirz' && m.on)) {
+    ctx.strokeStyle = '#ff6b35'; ctx.lineWidth = 2; ctx.globalAlpha = 0.8; ctx.beginPath();
+    const step = wH <= 24 ? 0.25 : 1;
+    for (let t = 0; t <= wH; t += step) { const g = getKaStretch(sH + t); const norm = (g.stretch - 1) / 5; const x = p.l + (t/wH) * cw, y = tY + hH - Math.min(1, norm) * hH; t === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+    ctx.stroke(); ctx.globalAlpha = 0.06; ctx.fillStyle = '#ff6b35'; ctx.lineTo(p.l + cw, tY + hH); ctx.lineTo(p.l, tY + hH); ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1;
+  }
+  ctx.fillStyle = 'rgba(255,211,42,.03)'; ctx.fillRect(p.l, bY, cw, bH);
+  ctx.fillStyle = 'rgba(255,107,53,.05)'; ctx.fillRect(p.l, bY, cw, (2/7) * bH);
+  ctx.fillStyle = '#4a4a5e'; ctx.font = '8px IBM Plex Mono';
+  ctx.textAlign = 'right'; ctx.fillText('pH 0', p.l - 4, bY + 8); ctx.fillText('pH 7', p.l - 4, bY + bH - 2);
+  ctx.textAlign = 'left'; ctx.fillText('GASTRIC pH', p.l + 4, bY + 8);
+  ctx.fillStyle = 'rgba(255,107,53,.35)'; ctx.fillText('⚠ MPH hydrolysis zone', p.l + 4, bY + (1.2/7) * bH);
+  const betM = meds.find(m => m.id === 'bet');
+  if (betM && betM.on) {
+    ctx.strokeStyle = '#ffd32a'; ctx.lineWidth = 2; ctx.beginPath();
+    const bDH = tH(betM.time), step = wH <= 24 ? 0.08 : 0.5;
+    for (let t = 0; t <= wH; t += step) {
+      const aT = sH + t; let ph = 3.5;
+      for (let d = 0; d < 28; d++) { const dT = d * 24 + bDH, dt = aT - dT; if (dt >= 0 && dt < 5) { const g = gOn ? getKaStretch(dT) : { betWinH: 1.28 }; const wn = g.betWinH; if (dt < 0.1) ph = Math.min(ph, 3.5 - 2.9 * (dt / 0.1)); else if (dt < wn) ph = Math.min(ph, 0.6 + dt * 0.15); else ph = Math.min(ph, 0.6 + wn * 0.15 + (dt - wn) * 2.0); } }
+      ph = Math.min(ph, 3.5); const x = p.l + (t/wH) * cw, y = bY + (ph / 7) * bH; t === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+}
+function renderLeg() {
+  const el = $('leg'); el.innerHTML = '';
+  meds.filter(m => m.on).forEach(m => { const d = document.createElement('div'); d.className = 'li'; d.innerHTML = `<span class="sw" style="background:${m.color}"></span>${m.name.split(' ')[0]}`; el.appendChild(d); });
+  if (gOn) { const d = document.createElement('div'); d.className = 'li'; d.innerHTML = '<span class="gw" style="border-color:#888"></span>No delay'; el.appendChild(d); }
+}
+
+function renderIns(dO) {
+  const dP = dO % 7, g = getKaStretch(dO * 24 + 12);
+  let h = '';
+  if (gOn && meds.find(m => m.id === 'tirz' && m.on))
+    h += `<div class="ins" style="border-color:var(--tirz)"><span class="w">GASTRIC DELAY (Day ${dP}):</span> ka stretched ${g.stretch.toFixed(1)}x — absorption takes ${g.stretch.toFixed(1)}x longer. Peak drops naturally. AUC unchanged. Betaine window: ${Math.round(g.betWinH * 60)}min.</div>`;
+  const betM = meds.find(m => m.id === 'bet' && m.on), mphM = meds.find(m => m.id === 'mph' && m.on), valM = meds.find(m => m.id === 'vals' && m.on), irnM = meds.find(m => m.id === 'iron' && m.on), fluM = meds.find(m => m.id === 'fluo' && m.on), tyrM = meds.find(m => m.id === 'tyro' && m.on);
+  if (betM && mphM) {
+    const gap = Math.abs(tH(mphM.time) - tH(betM.time)), aw = gOn ? g.betWinH : 1.28;
+    if (gap < aw + 0.5) h += `<div class="ins"><span class="w">⚠ MPH IN ACID TRAP:</span> ${Math.round(gap*60)}min gap vs ${Math.round(aw*60)}min acid window. pH 0.6 hydrolyzes MPH.${gOn ? ' Stretched ka extends stomach residence.' : ''} Dose MPH ≥${Math.ceil(aw + 1)}h before betaine.</div>`;
+    else h += `<div class="ins"><span class="g">✓</span> MPH ${Math.round(gap*60)}min from betaine. Clear of acid window.</div>`;
+  }
+  if (betM && valM) { const gap = Math.abs(tH(valM.time) - tH(betM.time)), aw = gOn ? g.betWinH : 1.28; if (gap < aw + 0.5) h += `<div class="ins"><span class="w">⚠ VALSARTAN:</span> Precipitates at pH<2. Acid window ${Math.round(aw*60)}min. Move to bedtime or ≥3h after betaine.</div>`; }
+  if (betM && irnM) { const gap = Math.abs(tH(irnM.time) - tH(betM.time)); if (gap < 2) h += `<div class="ins"><span class="g">✓ IRON:</span> Fe2+ maintained in acid.${gOn ? ' Extended gastric residence = longer acid bath. Optimal.' : ''}</div>`; }
+  if (fluM && mphM) h += `<div class="ins"><span class="w">⚠ D2R:</span> Chronic fluoxetine+MPH → D2 receptor density down 45-52%. Structural. No timing fix.</div>`;
+  if (mphM && gOn) h += `<div class="ins" style="border-color:var(--bet)"><strong>MIDDAY TROUGH:</strong> MPH absorption stretched ${g.stretch.toFixed(1)}x — peaks blur into lower, wider plateau. Same total drug absorbed but concentration may not reach therapeutic threshold. Strongest days 0-2, recovers by day 5-6. Toggle delay off to compare.</div>`;
+  $('ins').innerHTML = h;
+}
+mcC.addEventListener('mousemove', e => {
+  const r = mcC.getBoundingClientRect(), wH = +$('vw').value, sH = +$('doff').value * 24;
+  const rx = (e.clientX - r.left - 46) / (r.width - 62);
+  if (rx < 0 || rx > 1) { $('tt').style.display = 'none'; return; }
+  const aH = sH + rx * wH, g = getKaStretch(aH);
+  const dn = Math.floor(aH/24) + 1, dp = Math.floor(aH/24) % 7;
+  let t = `<strong>Day ${dn} — ${String(Math.floor(aH%24)).padStart(2,'0')}:${String(Math.round((aH%1)*60)%60).padStart(2,'0')}</strong><br>${dp}d post-inj`;
+  if (gOn) t += `<div class="gd">ka stretch: ${g.stretch.toFixed(1)}x | Acid window: ${Math.round(g.betWinH*60)}min</div>`;
+  t += '<br>';
+  meds.filter(m => m.on).forEach(m => { t += `<span style="color:${m.color}">●</span> ${m.name.split(' ')[0]}: ${evalMed(m, aH).toFixed(3)}<br>`; });
+  const tt = $('tt'); tt.innerHTML = t; tt.style.display = 'block';
+  tt.style.left = Math.min(e.clientX + 14, innerWidth - 290) + 'px';
+  tt.style.top = (e.clientY - 8) + 'px';
+});
+mcC.addEventListener('mouseleave', () => { $('tt').style.display = 'none'; });
+
+$('gTog').addEventListener('click', () => { gOn = !gOn; $('gTog').classList.toggle('on'); render(); });
+$('vw').addEventListener('change', render);
+$('doff').addEventListener('input', render);
+addEventListener('resize', render);
+
+buildSidebar();
+render();
+</script>
+</body>
+</html>

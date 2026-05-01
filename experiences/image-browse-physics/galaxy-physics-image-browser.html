@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Galaxy Physics Image Browser</title>
+    <script src="../_vendor/d3.v7.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: radial-gradient(ellipse at center, #1a1a2e 0%, #16213e 35%, #0f0f1e 100%);
+            overflow: hidden;
+        }
+
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        #drop-zone {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 400px;
+            height: 200px;
+            border: 3px dashed rgba(255,255,255,0.3);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: rgba(255,255,255,0.7);
+            font-size: 18px;
+            text-align: center;
+            transition: all 0.3s ease;
+            z-index: 10;
+            backdrop-filter: blur(5px);
+            background: rgba(0,0,0,0.2);
+        }
+
+        #drop-zone.dragover {
+            border-color: #4a9eff;
+            background: rgba(74, 158, 255, 0.15);
+            color: #4a9eff;
+            box-shadow: 0 0 30px rgba(74, 158, 255, 0.3);
+        }
+
+        #drop-zone.hidden {
+            display: none;
+        }
+
+        svg {
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+        }
+
+        svg:active {
+            cursor: grabbing;
+        }
+
+        .image-node {
+            cursor: move;
+            filter: drop-shadow(0 2px 12px rgba(0,0,0,0.4));
+            transition: filter 0.2s ease;
+        }
+
+        .image-node:hover {
+            filter: drop-shadow(0 6px 24px rgba(74, 158, 255, 0.4)) brightness(1.1);
+        }
+
+        .image-node.queen {
+            filter: drop-shadow(0 8px 32px rgba(255, 215, 0, 0.6)) brightness(1.2);
+            z-index: 1000;
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        #controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        #image-count {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        button {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            backdrop-filter: blur(10px);
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        button:hover {
+            background: rgba(255,255,255,0.2);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+        }
+
+        #center-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 6px;
+            height: 6px;
+            background: rgba(74, 158, 255, 0.5);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 5;
+            box-shadow: 0 0 20px rgba(74, 158, 255, 0.8);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: translate(-50%, -50%) scale(1); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.5); }
+        }
+
+        .spawn-animation {
+            animation: galaxySpawn 0.8s ease-out;
+        }
+
+        @keyframes galaxySpawn {
+            0% { 
+                opacity: 0; 
+                transform: scale(0) rotate(180deg);
+            }
+            100% { 
+                opacity: 1; 
+                transform: scale(1) rotate(0deg);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="drop-zone">
+            Drop your creative universe here<br>
+            <small>Watch it form a galaxy ✨</small>
+        </div>
+        
+        <div id="center-indicator"></div>
+        
+        <div id="controls">
+            <div id="image-count">0 celestial bodies</div>
+            <button onclick="resetGalaxy()">Reform Galaxy</button>
+            <button onclick="clearUniverse()">Big Bang</button>
+        </div>
+
+        <input type="file" id="file-input" multiple accept="image/*" webkitdirectory>
+        <input type="file" id="image-input" multiple accept="image/*">
+        
+        <svg id="physics-canvas"></svg>
+    </div>
+
+    <script>
+        // Galaxy physics simulation
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+        let centerX = width / 2;
+        let centerY = height / 2;
+        let images = [];
+        let simulation;
+        let queenImage = null;
+        let galaxyRadius = Math.min(width, height) * 0.4;
+        
+        const svg = d3.select('#physics-canvas');
+        const container = svg.append('g');
+        
+        // Distance-based scaling for visual hierarchy
+        const sizeScale = d3.scaleLinear()
+            .domain([0, galaxyRadius])
+            .range([1.5, 0.6]) // Center images 50% bigger, edge images 40% smaller
+            .clamp(true);
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            centerX = width / 2;
+            centerY = height / 2;
+            galaxyRadius = Math.min(width, height) * 0.4;
+            
+            svg.attr('width', width).attr('height', height);
+            sizeScale.domain([0, galaxyRadius]);
+            
+            if (simulation) {
+                simulation.force('center', d3.forceCenter(centerX, centerY));
+                simulation.force('boundary', galaxyBoundaryForce());
+                simulation.alpha(0.3).restart();
+            }
+        });
+
+        // Galaxy boundary force - keeps everything in a circular boundary
+        function galaxyBoundaryForce() {
+            return function(alpha) {
+                images.forEach(d => {
+                    const dx = d.x - centerX;
+                    const dy = d.y - centerY;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    const radius = Math.max(d.width, d.height) / 2;
+                    const maxDistance = galaxyRadius - radius;
+                    
+                    if (distance > maxDistance) {
+                        const angle = Math.atan2(dy, dx);
+                        const targetDistance = maxDistance - 10;
+                        const targetX = centerX + Math.cos(angle) * targetDistance;
+                        const targetY = centerY + Math.sin(angle) * targetDistance;
+                        
+                        d.vx += (targetX - d.x) * alpha * 0.1;
+                        d.vy += (targetY - d.y) * alpha * 0.1;
+                    }
+                });
+            };
+        }
+
+        // Local interaction force - only nearby images react to queen movement
+        function localInteractionForce() {
+            return function(alpha) {
+                if (!queenImage) return;
+                
+                const interactionRadius = 150; // Only affect nearby images
+                
+                images.forEach(d => {
+                    if (d === queenImage) return;
+                    
+                    const dx = d.x - queenImage.x;
+                    const dy = d.y - queenImage.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < interactionRadius && distance > 0) {
+                        const strength = (interactionRadius - distance) / interactionRadius;
+                        const repulsion = 50 * strength * alpha;
+                        
+                        d.vx += (dx / distance) * repulsion;
+                        d.vy += (dy / distance) * repulsion;
+                    }
+                });
+            };
+        }
+
+        // Enhanced collision with density awareness
+        function galaxyCollisionForce() {
+            return d3.forceCollide()
+                .radius(d => {
+                    const baseRadius = Math.max(d.width, d.height) / 2;
+                    const densityFactor = 1 + (d.density || 0) * 0.5;
+                    return baseRadius * densityFactor + 4;
+                })
+                .strength(0.9)
+                .iterations(4);
+        }
+
+        // Calculate optimal thumbnail sizes with density awareness
+        function calculateGalaxySizing(imageCount) {
+            const galaxyArea = Math.PI * galaxyRadius * galaxyRadius * 0.8; // Use 80% of galaxy area
+            const averageArea = galaxyArea / imageCount;
+            let baseSize = Math.sqrt(averageArea);
+            
+            // Intelligent size tiers based on image count
+            if (imageCount <= 20) baseSize = Math.min(200, baseSize);
+            else if (imageCount <= 50) baseSize = Math.min(160, baseSize);
+            else if (imageCount <= 100) baseSize = Math.min(120, baseSize);
+            else if (imageCount <= 300) baseSize = Math.min(100, baseSize);
+            else if (imageCount <= 600) baseSize = Math.min(80, baseSize);
+            else if (imageCount <= 1000) baseSize = Math.min(70, baseSize);
+            else if (imageCount <= 2000) baseSize = Math.min(60, baseSize);
+            else baseSize = Math.min(50, baseSize);
+            
+            return Math.max(30, baseSize); // Never smaller than 30px
+        }
+
+        // Galaxy spawning pattern - images spawn from center in spiral
+        function calculateGalaxyPosition(index, total, baseSize) {
+            const spiralTightness = 0.5;
+            const angle = index * spiralTightness + (index / total) * Math.PI * 8;
+            const spiralRadius = (index / total) * galaxyRadius * 0.9;
+            
+            // Add some randomness for organic feel
+            const randomOffset = (Math.random() - 0.5) * baseSize;
+            const x = centerX + Math.cos(angle) * spiralRadius + randomOffset;
+            const y = centerY + Math.sin(angle) * spiralRadius + randomOffset;
+            
+            return { x, y };
+        }
+
+        // Generate high-quality thumbnail with distance-based sizing
+        function generateGalaxyThumbnail(img, baseSize, distanceFromCenter = 0) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Apply distance-based scaling
+            const sizeMultiplier = sizeScale(distanceFromCenter);
+            const aspectRatio = img.naturalWidth / img.naturalHeight;
+            
+            let thumbWidth, thumbHeight;
+            if (aspectRatio > 1) {
+                thumbWidth = baseSize * sizeMultiplier;
+                thumbHeight = thumbWidth / aspectRatio;
+            } else {
+                thumbHeight = baseSize * sizeMultiplier;
+                thumbWidth = thumbHeight * aspectRatio;
+            }
+            
+            // Add subtle size variation for organic feel
+            const variation = 0.85 + (Math.random() * 0.3); // 85% to 115%
+            thumbWidth *= variation;
+            thumbHeight *= variation;
+            
+            canvas.width = thumbWidth;
+            canvas.height = thumbHeight;
+            
+            // Ultra high quality scaling
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            
+            // Add subtle glow effect for space aesthetic
+            ctx.shadowColor = 'rgba(74, 158, 255, 0.3)';
+            ctx.shadowBlur = 2;
+            
+            ctx.drawImage(img, 0, 0, thumbWidth, thumbHeight);
+            
+            return {
+                dataURL: canvas.toDataURL('image/jpeg', 0.88),
+                width: thumbWidth,
+                height: thumbHeight
+            };
+        }
+
+        // Load images with galaxy formation
+        async function loadImages(files) {
+            document.getElementById('drop-zone').classList.add('hidden');
+            document.getElementById('center-indicator').style.display = 'none';
+            
+            const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
+            const baseSize = calculateGalaxySizing(imageFiles.length);
+            
+            console.log(`Forming galaxy with ${imageFiles.length} images, base size: ${baseSize}px`);
+            
+            images = [];
+            let loadedCount = 0;
+            
+            // Enhanced progress indicator
+            const progressDiv = document.createElement('div');
+            progressDiv.style.cssText = `
+                position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+                background: rgba(0,0,0,0.9); color: white; padding: 24px; border-radius: 12px;
+                font-size: 16px; z-index: 1000; backdrop-filter: blur(10px);
+                border: 1px solid rgba(74, 158, 255, 0.3);
+                box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+                text-align: center; min-width: 250px;
+            `;
+            document.body.appendChild(progressDiv);
+            
+            for (let index = 0; index < imageFiles.length; index++) {
+                const file = imageFiles[index];
+                
+                try {
+                    const img = new Image();
+                    const url = URL.createObjectURL(file);
+                    
+                    await new Promise((resolve, reject) => {
+                        img.onload = resolve;
+                        img.onerror = reject;
+                        img.src = url;
+                    });
+                    
+                    // Calculate position in galaxy spiral
+                    const position = calculateGalaxyPosition(index, imageFiles.length, baseSize);
+                    const distanceFromCenter = Math.sqrt((position.x - centerX) ** 2 + (position.y - centerY) ** 2);
+                    
+                    // Generate size-aware thumbnail
+                    const thumbnailData = generateGalaxyThumbnail(img, baseSize, distanceFromCenter);
+                    URL.revokeObjectURL(url);
+                    
+                    images.push({
+                        id: index,
+                        thumbnailURL: thumbnailData.dataURL,
+                        width: thumbnailData.width,
+                        height: thumbnailData.height,
+                        x: position.x,
+                        y: position.y,
+                        originalFile: file,
+                        fullSizeURL: null,
+                        distanceFromCenter: distanceFromCenter,
+                        spawnDelay: index * 15 // Stagger spawn animation
+                    });
+                    
+                } catch (error) {
+                    console.log(`Failed to process ${file.name}:`, error);
+                }
+                
+                loadedCount++;
+                const progress = (loadedCount / imageFiles.length * 100).toFixed(1);
+                progressDiv.innerHTML = `
+                    <div style="margin-bottom: 12px;">🌌 Forming Galaxy</div>
+                    <div>${loadedCount}/${imageFiles.length} celestial bodies</div>
+                    <div style="margin-top: 8px; font-size: 14px; opacity: 0.8;">${progress}%</div>
+                `;
+            }
+            
+            document.body.removeChild(progressDiv);
+            document.getElementById('image-count').textContent = `${images.length} celestial bodies`;
+            
+            renderGalaxy();
+            initGalaxySimulation();
+        }
+
+        // Initialize galaxy physics simulation
+        function initGalaxySimulation() {
+            simulation = d3.forceSimulation(images)
+                .force('charge', d3.forceManyBody().strength(-20)) // Gentle cosmic repulsion
+                .force('center', d3.forceCenter(centerX, centerY).strength(0.02)) // Weak galactic center
+                .force('collide', galaxyCollisionForce())
+                .force('boundary', galaxyBoundaryForce())
+                .force('local', localInteractionForce()) // Local queen interactions
+                .on('tick', galaxyTick);
+        }
+
+        // Enhanced galaxy tick with smooth animations
+        function galaxyTick() {
+            container.selectAll('g.image-node')
+                .attr('transform', d => `translate(${d.x},${d.y})`);
+        }
+
+        // Render galaxy with staggered spawn animations
+        function renderGalaxy() {
+            const nodes = container.selectAll('g.image-node')
+                .data(images, d => d.id);
+            
+            const nodeEnter = nodes.enter()
+                .append('g')
+                .attr('class', 'image-node spawn-animation')
+                .style('opacity', 0)
+                .call(d3.drag()
+                    .on('start', galaxyDragStarted)
+                    .on('drag', galaxyDragged)
+                    .on('end', galaxyDragEnded));
+            
+            nodeEnter.append('image')
+                .attr('href', d => d.thumbnailURL)
+                .attr('width', d => d.width)
+                .attr('height', d => d.height)
+                .attr('x', d => -d.width / 2)
+                .attr('y', d => -d.height / 2)
+                .style('border-radius', '6px')
+                .style('cursor', 'pointer')
+                .on('click', showCosmicDetailView);
+            
+            // Staggered spawn animation
+            nodeEnter.each(function(d, i) {
+                d3.select(this)
+                    .transition()
+                    .delay(d.spawnDelay)
+                    .duration(800)
+                    .style('opacity', 1)
+                    .on('end', function() {
+                        d3.select(this).classed('spawn-animation', false);
+                    });
+            });
+            
+            nodes.exit()
+                .transition()
+                .duration(300)
+                .style('opacity', 0)
+                .remove();
+        }
+
+        // Enhanced detail view with cosmic styling
+        async function showCosmicDetailView(event, d) {
+            event.stopPropagation();
+            
+            if (!d.fullSizeURL) {
+                d.fullSizeURL = URL.createObjectURL(d.originalFile);
+            }
+            
+            const modal = d3.select('body').append('div')
+                .style('position', 'fixed')
+                .style('top', '0')
+                .style('left', '0')
+                .style('width', '100%')
+                .style('height', '100%')
+                .style('background', 'rgba(0,0,0,0.95)')
+                .style('z-index', '2000')
+                .style('display', 'flex')
+                .style('align-items', 'center')
+                .style('justify-content', 'center')
+                .style('cursor', 'pointer')
+                .style('backdrop-filter', 'blur(10px)')
+                .style('opacity', '0')
+                .on('click', function() { 
+                    modal.transition().duration(200).style('opacity', '0').remove();
+                });
+            
+            modal.transition().duration(300).style('opacity', '1');
+            
+            modal.append('img')
+                .attr('src', d.fullSizeURL)
+                .style('max-width', '90%')
+                .style('max-height', '90%')
+                .style('border-radius', '12px')
+                .style('box-shadow', '0 0 60px rgba(74, 158, 255, 0.3)')
+                .style('transform', 'scale(0.8)')
+                .transition()
+                .duration(300)
+                .style('transform', 'scale(1)');
+            
+            // Enhanced filename with metadata
+            const info = modal.append('div')
+                .style('position', 'absolute')
+                .style('bottom', '30px')
+                .style('color', 'white')
+                .style('font-size', '16px')
+                .style('background', 'rgba(0,0,0,0.8)')
+                .style('padding', '12px 20px')
+                .style('border-radius', '8px')
+                .style('backdrop-filter', 'blur(10px)')
+                .style('border', '1px solid rgba(74, 158, 255, 0.3)');
+            
+            info.append('div').text(d.originalFile.name);
+            info.append('div')
+                .style('font-size', '12px')
+                .style('opacity', '0.7')
+                .style('margin-top', '4px')
+                .text(`${(d.originalFile.size / 1024).toFixed(1)} KB • Distance from center: ${d.distanceFromCenter.toFixed(0)}px`);
+        }
+
+        // Galaxy drag behavior with queen mechanics
+        function galaxyDragStarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            queenImage = d;
+            d.fx = d.x;
+            d.fy = d.y;
+            
+            // Visual queen feedback
+            d3.select(this)
+                .classed('queen', true)
+                .transition()
+                .duration(150)
+                .style('transform', 'scale(1.15)');
+        }
+
+        function galaxyDragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+
+        function galaxyDragEnded(event, d) {
+            // Queen stays put - deterministic placement
+            d.fx = event.x;
+            d.fy = event.y;
+            
+            // Remove queen styling
+            d3.select(this)
+                .classed('queen', false)
+                .transition()
+                .duration(300)
+                .style('transform', 'scale(1)');
+            
+            // Let local interactions settle, then clear queen
+            setTimeout(() => {
+                queenImage = null;
+                if (!event.active) simulation.alphaTarget(0);
+            }, 1200);
+        }
+
+        // Galaxy utility functions
+        function resetGalaxy() {
+            images.forEach((d, i) => {
+                const position = calculateGalaxyPosition(i, images.length, 60);
+                d.x = position.x;
+                d.y = position.y;
+                d.fx = null;
+                d.fy = null;
+            });
+            queenImage = null;
+            if (simulation) simulation.alpha(0.6).restart();
+        }
+
+        function clearUniverse() {
+            images.forEach(d => {
+                URL.revokeObjectURL(d.thumbnailURL);
+                if (d.fullSizeURL) URL.revokeObjectURL(d.fullSizeURL);
+            });
+            images = [];
+            queenImage = null;
+            container.selectAll('g').remove();
+            document.getElementById('drop-zone').classList.remove('hidden');
+            document.getElementById('center-indicator').style.display = 'block';
+            document.getElementById('image-count').textContent = '0 celestial bodies';
+            if (simulation) simulation.stop();
+        }
+
+        // File handling setup
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const imageInput = document.getElementById('image-input');
+
+        dropZone.addEventListener('click', () => {
+            if (confirm('🌌 Load entire galaxy? (OK = folder, Cancel = individual stars)')) {
+                fileInput.click();
+            } else {
+                imageInput.click();
+            }
+        });
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                loadImages(files);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                loadImages(e.target.files);
+            }
+        });
+
+        imageInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                loadImages(e.target.files);
+            }
+        });
+
+        // Initialize
+        svg.attr('width', width).attr('height', height);
+    </script>
+</body>
+</html>
