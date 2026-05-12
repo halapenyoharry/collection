@@ -59,12 +59,20 @@
       "added": "2026-04-18"
     },
     {
-      "id": "image-browse-physics",
-      "title": "Image Browse — Physics",
-      "description": "Drop a folder of images and browse them through D3-driven physics fields.",
-      "path": "experiences/image-browse-physics/index.html",
-      "tags": ["data-viz", "d3", "physics", "interactive"],
-      "added": "2026-04-18"
+      "id": "tts-reader",
+      "title": "TTS Reader",
+      "description": "A self-contained, dark-themed web application for making local markdown content audible via the browser's text-to-speech API.",
+      "url": "https://halapenyoharry.github.io/tts-reader/",
+      "tags": ["text-to-speech", "markdown-reader", "web-utility", "single-file"],
+      "added": "2026-04-22"
+    },
+    {
+      "id": "zero-friction-image-browser",
+      "title": "Zero Friction Image Browser",
+      "description": "An image browser that eliminates all setup friction. Drop a folder, browse images, rate them — no database, no library, no config.",
+      "url": "https://halapenyoharry.github.io/zero-friction-image-browser/",
+      "tags": ["image-browser", "drag-drop", "zero-config"],
+      "added": "2026-04-22"
     }
   ]
 }
