@@ -54,7 +54,7 @@
       "id": "med-curves",
       "title": "MedCurvez",
       "description": "AUC-preserving gastric delay model — interactive dose/absorption curves across medications.",
-      "path": "experiences/med-curves/med-curves-v3.html",
+      "path": "experiences/med-curves/index.html",
       "tags": ["data-viz", "medical", "interactive"],
       "added": "2026-04-18"
     },

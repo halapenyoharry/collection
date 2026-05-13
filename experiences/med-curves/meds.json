@@ -1,0 +1,109 @@
+{
+  "_comment": "Default medication set for med-curves. Edit this file to model your own regimen. Half-lives are in hours. ka and ke are computed at load time as ln(2)/halfLifeAbsH and ln(2)/halfLifeElimH. For bimodal ER drugs, use halfLifeAbs1H/halfLifeElim1H + halfLifeAbs2H/halfLifeElim2H + delay2 (hours) + ratio [first, second]. Optional flags: isBet (creates an acid window), acidSens+acidLoss (degraded by acid), acidBen+acidBoost (boosted by acid), ssFloor (steady-state plateau), accum (weekly accumulation factor).",
+  "meds": [
+    {
+      "id": "glp1",
+      "name": "Semaglutide 1mg",
+      "color": "#ff6b35",
+      "on": true,
+      "time": "08:00",
+      "freq": "weekly",
+      "route": "sc",
+      "halfLifeAbsH": 18,
+      "halfLifeElimH": 168,
+      "accum": 1.5,
+      "info": "t½=7d | SC — not gastric-modulated\nSource of GLP-1 gastric delay"
+    },
+    {
+      "id": "apap",
+      "name": "Acetaminophen 500mg",
+      "color": "#7b68ee",
+      "on": true,
+      "time": "07:00",
+      "freq": "daily",
+      "route": "oral",
+      "halfLifeAbsH": 0.5,
+      "halfLifeElimH": 2.5,
+      "info": "t½=2-3h | Classic gastric-emptying probe\n⚠ Tmax delayed by GLP-1 (see study)"
+    },
+    {
+      "id": "addxr",
+      "name": "Amphetamine ER 10mg",
+      "color": "#00d4aa",
+      "on": true,
+      "time": "07:00",
+      "freq": "daily",
+      "route": "oral",
+      "bimodal": true,
+      "halfLifeAbs1H": 0.8,
+      "halfLifeElim1H": 10,
+      "halfLifeAbs2H": 1.2,
+      "halfLifeElim2H": 10,
+      "delay2": 4,
+      "ratio": [0.5, 0.5],
+      "info": "Bimodal ER: two bead populations\nka stretched → peaks blur"
+    },
+    {
+      "id": "lis",
+      "name": "Lisinopril 10mg",
+      "color": "#ff4757",
+      "on": true,
+      "time": "07:00",
+      "freq": "daily",
+      "route": "oral",
+      "halfLifeAbsH": 1.5,
+      "halfLifeElimH": 12,
+      "info": "t½=12h | ACE inhibitor, common BP med"
+    },
+    {
+      "id": "vitc",
+      "name": "Vitamin C 500mg",
+      "color": "#ffd32a",
+      "on": true,
+      "time": "07:00",
+      "freq": "daily",
+      "route": "oral",
+      "halfLifeAbsH": 0.5,
+      "halfLifeElimH": 8,
+      "info": "t½=8h | Water-soluble, acid-stable"
+    },
+    {
+      "id": "bet",
+      "name": "Betaine HCl 1500mg",
+      "color": "#fdcb6e",
+      "on": false,
+      "time": "07:00",
+      "freq": "daily",
+      "route": "oral",
+      "isBet": true,
+      "info": "pH→0.6 in 6.3min | OFF by default\nToggle on to see acid-window interactions"
+    },
+    {
+      "id": "iron",
+      "name": "Iron 65mg",
+      "color": "#e17055",
+      "on": false,
+      "time": "07:00",
+      "freq": "daily",
+      "route": "oral",
+      "halfLifeAbsH": 2.0,
+      "halfLifeElimH": 8,
+      "acidBen": true,
+      "acidBoost": 0.30,
+      "info": "Tmax=4h | ✓ Hyper-absorbs in acid (try with betaine on)"
+    },
+    {
+      "id": "vd",
+      "name": "Vitamin D3 5000IU",
+      "color": "#a29bfe",
+      "on": true,
+      "time": "07:00",
+      "freq": "daily",
+      "route": "oral",
+      "halfLifeAbsH": 6,
+      "halfLifeElimH": 480,
+      "ssFloor": 0.95,
+      "info": "25(OH)D t½=20d | Immune to daily GI variation"
+    }
+  ]
+}

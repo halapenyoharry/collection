@@ -100,7 +100,7 @@ canvas{width:100%;display:block}
   CORE PHYSICS: AUC-PRESERVING GASTRIC DELAY
   A one-compartment oral PK model: C(t) = (F·D·ka)/(Vd·(ka-ke)) · (e^(-ke·t) - e^(-ka·t))
   AUC = (F·D)/(Vd·ke) — ka cancels out. AUC does NOT depend on absorption rate.
-  Tirzepatide slows gastric emptying → slows ka → curve widens, peak drops, AUC preserved.
+  GLP-1 agonists slow gastric emptying → slow ka → curve widens, peak drops, AUC preserved.
   GPGA study: Cmax dropped 50%, AUC unchanged, Tmax delayed ~1h.
 */
 function getTirzFrac(absHour) {
@@ -131,19 +131,24 @@ function oneCompartment(t, ka, ke) {
 
 const tH = s => { const [h,m] = s.split(':').map(Number); return h + m/60; };
 
-const meds = [
-  { id:'tirz', name:'Tirzepatide 10mg', color:'#ff6b35', on:true, time:'08:00', freq:'weekly', route:'sc', ka: Math.log(2)/18, ke: Math.log(2)/120, accum: 1.65, info:'t½=120h | SC — not gastric-modulated\nSource of GLP-1 gastric delay' },
-  { id:'mph', name:'Methylphenidate ER', color:'#00d4aa', on:true, time:'07:00', freq:'daily', route:'oral', bimodal: true, ka1: Math.log(2)/0.8, ke1: Math.log(2)/3.5, ka2: Math.log(2)/1.2, ke2: Math.log(2)/3.5, delay2: 3.5, ratio: [0.5, 0.5], acidSens: true, acidLoss: 0.25, info:'Bimodal ER: two bead populations\nka stretched → peaks blur\n⚠ Acid hydrolysis in betaine trap' },
-  { id:'fluo', name:'Fluoxetine 40mg', color:'#7b68ee', on:true, time:'07:00', freq:'daily', route:'oral', ka: Math.log(2)/3, ke: Math.log(2)/120, ssFloor: 0.85, info:'t½=4-6d | Steady state: flat\n⚠ D2R downregulation 45-52%' },
-  { id:'vals', name:'Valsartan 160mg', color:'#ff4757', on:true, time:'07:00', freq:'daily', route:'oral', ka: Math.log(2)/1.2, ke: Math.log(2)/7.5, acidSens: true, acidLoss: 0.40, info:'t½=6-9h | Bioavail=25%\n⚠ Precipitates at pH<2' },
-  { id:'hctz', name:'HCTZ 25mg', color:'#ff6b81', on:true, time:'07:00', freq:'daily', route:'oral', ka: Math.log(2)/0.8, ke: Math.log(2)/10, info:'t½=5-15h | Tmax=2h' },
-  { id:'bet', name:'Betaine HCl 1500mg', color:'#ffd32a', on:true, time:'07:00', freq:'daily', route:'oral', isBet: true, info:'pH→0.6 in 6.3min | Window stretches w/ delay\n⚠ Destroys MPH, precipitates valsartan\n✓ Optimizes iron' },
-  { id:'tyro', name:'L-Tyrosine 500mg', color:'#0abde3', on:true, time:'06:30', freq:'daily', route:'oral', ka: Math.log(2)/1.0, ke: Math.log(2)/3, info:'Tmax=2-3h | DA precursor' },
-  { id:'biot', name:'Biotin 10000mcg', color:'#a29bfe', on:true, time:'07:00', freq:'daily', route:'oral', ka: Math.log(2)/0.4, ke: Math.log(2)/2.5, info:'Tmax=1h | ~100% via SMVT\n⚠ Interferes w/ immunoassays' },
-  { id:'iron', name:'Iron 65mg', color:'#e17055', on:true, time:'07:00', freq:'daily', route:'oral', ka: Math.log(2)/2.0, ke: Math.log(2)/8, acidBen: true, acidBoost: 0.30, info:'Tmax=4h | ✓ Hyper-absorbs in acid' },
-  { id:'om3', name:'Omega-3 1200mg', color:'#00cec9', on:true, time:'07:00', freq:'daily', route:'oral', ka: Math.log(2)/3, ke: Math.log(2)/55, ssFloor: 0.7, info:'EPA t½=45h | DHA t½=66h' },
-  { id:'vd', name:'Vitamin D3 5000IU', color:'#fdcb6e', on:true, time:'07:00', freq:'daily', route:'oral', ka: Math.log(2)/6, ke: Math.log(2)/480, ssFloor: 0.95, info:'25(OH)D t½=20d | Immune to daily GI variation' }
+let meds = [];
+const FALLBACK_MEDS = [
+  { id:'glp1', name:'Semaglutide 1mg', color:'#ff6b35', on:true, time:'08:00', freq:'weekly', route:'sc', ka: Math.log(2)/18, ke: Math.log(2)/168, accum: 1.5, info:'t½=7d | SC — not gastric-modulated\nSource of GLP-1 gastric delay' },
+  { id:'apap', name:'Acetaminophen 500mg', color:'#7b68ee', on:true, time:'07:00', freq:'daily', route:'oral', ka: Math.log(2)/0.5, ke: Math.log(2)/2.5, info:'t½=2-3h | Classic gastric-emptying probe' }
 ];
+function computePK(m) {
+  const r = { ...m };
+  if (m.bimodal) {
+    if (m.halfLifeAbs1H) r.ka1 = Math.log(2) / m.halfLifeAbs1H;
+    if (m.halfLifeElim1H) r.ke1 = Math.log(2) / m.halfLifeElim1H;
+    if (m.halfLifeAbs2H) r.ka2 = Math.log(2) / m.halfLifeAbs2H;
+    if (m.halfLifeElim2H) r.ke2 = Math.log(2) / m.halfLifeElim2H;
+  } else {
+    if (m.halfLifeAbsH) r.ka = Math.log(2) / m.halfLifeAbsH;
+    if (m.halfLifeElimH) r.ke = Math.log(2) / m.halfLifeElimH;
+  }
+  return r;
+}
 let gOn = true;
 
 function evalMed(med, absH) {
@@ -257,7 +262,7 @@ function renderGastric(sH, wH) {
   ctx.fillStyle = '#4a4a5e'; ctx.font = '8px IBM Plex Mono';
   ctx.textAlign = 'right'; ctx.fillText('6x', p.l - 4, tY + 8); ctx.fillText('1x', p.l - 4, tY + hH - 2);
   ctx.textAlign = 'left'; ctx.fillText('ka STRETCH (absorption slowdown)', p.l + 4, tY + 8);
-  if (meds.find(m => m.id === 'tirz' && m.on)) {
+  if (meds.find(m => m.id === 'glp1' && m.on)) {
     ctx.strokeStyle = '#ff6b35'; ctx.lineWidth = 2; ctx.globalAlpha = 0.8; ctx.beginPath();
     const step = wH <= 24 ? 0.25 : 1;
     for (let t = 0; t <= wH; t += step) { const g = getKaStretch(sH + t); const norm = (g.stretch - 1) / 5; const x = p.l + (t/wH) * cw, y = tY + hH - Math.min(1, norm) * hH; t === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
@@ -290,18 +295,17 @@ function renderLeg() {
 function renderIns(dO) {
   const dP = dO % 7, g = getKaStretch(dO * 24 + 12);
   let h = '';
-  if (gOn && meds.find(m => m.id === 'tirz' && m.on))
+  if (gOn && meds.find(m => m.id === 'glp1' && m.on))
     h += `<div class="ins" style="border-color:var(--tirz)"><span class="w">GASTRIC DELAY (Day ${dP}):</span> ka stretched ${g.stretch.toFixed(1)}x — absorption takes ${g.stretch.toFixed(1)}x longer. Peak drops naturally. AUC unchanged. Betaine window: ${Math.round(g.betWinH * 60)}min.</div>`;
-  const betM = meds.find(m => m.id === 'bet' && m.on), mphM = meds.find(m => m.id === 'mph' && m.on), valM = meds.find(m => m.id === 'vals' && m.on), irnM = meds.find(m => m.id === 'iron' && m.on), fluM = meds.find(m => m.id === 'fluo' && m.on), tyrM = meds.find(m => m.id === 'tyro' && m.on);
-  if (betM && mphM) {
-    const gap = Math.abs(tH(mphM.time) - tH(betM.time)), aw = gOn ? g.betWinH : 1.28;
-    if (gap < aw + 0.5) h += `<div class="ins"><span class="w">⚠ MPH IN ACID TRAP:</span> ${Math.round(gap*60)}min gap vs ${Math.round(aw*60)}min acid window. pH 0.6 hydrolyzes MPH.${gOn ? ' Stretched ka extends stomach residence.' : ''} Dose MPH ≥${Math.ceil(aw + 1)}h before betaine.</div>`;
-    else h += `<div class="ins"><span class="g">✓</span> MPH ${Math.round(gap*60)}min from betaine. Clear of acid window.</div>`;
+  const betM = meds.find(m => m.id === 'bet' && m.on), erM = meds.find(m => m.bimodal && m.on), valM = meds.find(m => m.id === 'vals' && m.on), irnM = meds.find(m => m.id === 'iron' && m.on);
+  if (betM && erM && erM.acidSens) {
+    const nm = erM.name.split(' ')[0], gap = Math.abs(tH(erM.time) - tH(betM.time)), aw = gOn ? g.betWinH : 1.28;
+    if (gap < aw + 0.5) h += `<div class="ins"><span class="w">⚠ ${nm.toUpperCase()} IN ACID TRAP:</span> ${Math.round(gap*60)}min gap vs ${Math.round(aw*60)}min acid window. pH 0.6 hydrolyzes ${nm}.${gOn ? ' Stretched ka extends stomach residence.' : ''} Dose ${nm} ≥${Math.ceil(aw + 1)}h before betaine.</div>`;
+    else h += `<div class="ins"><span class="g">✓</span> ${nm} ${Math.round(gap*60)}min from betaine. Clear of acid window.</div>`;
   }
   if (betM && valM) { const gap = Math.abs(tH(valM.time) - tH(betM.time)), aw = gOn ? g.betWinH : 1.28; if (gap < aw + 0.5) h += `<div class="ins"><span class="w">⚠ VALSARTAN:</span> Precipitates at pH<2. Acid window ${Math.round(aw*60)}min. Move to bedtime or ≥3h after betaine.</div>`; }
   if (betM && irnM) { const gap = Math.abs(tH(irnM.time) - tH(betM.time)); if (gap < 2) h += `<div class="ins"><span class="g">✓ IRON:</span> Fe2+ maintained in acid.${gOn ? ' Extended gastric residence = longer acid bath. Optimal.' : ''}</div>`; }
-  if (fluM && mphM) h += `<div class="ins"><span class="w">⚠ D2R:</span> Chronic fluoxetine+MPH → D2 receptor density down 45-52%. Structural. No timing fix.</div>`;
-  if (mphM && gOn) h += `<div class="ins" style="border-color:var(--bet)"><strong>MIDDAY TROUGH:</strong> MPH absorption stretched ${g.stretch.toFixed(1)}x — peaks blur into lower, wider plateau. Same total drug absorbed but concentration may not reach therapeutic threshold. Strongest days 0-2, recovers by day 5-6. Toggle delay off to compare.</div>`;
+  if (erM && gOn) h += `<div class="ins" style="border-color:var(--bet)"><strong>MIDDAY TROUGH:</strong> ${erM.name} absorption stretched ${g.stretch.toFixed(1)}x — peaks blur into lower, wider plateau. Same total drug absorbed but concentration may not reach therapeutic threshold. Strongest days 0-2, recovers by day 5-6. Toggle delay off to compare.</div>`;
   $('ins').innerHTML = h;
 }
 mcC.addEventListener('mousemove', e => {
@@ -325,8 +329,20 @@ $('vw').addEventListener('change', render);
 $('doff').addEventListener('input', render);
 addEventListener('resize', render);
 
-buildSidebar();
-render();
+async function init() {
+  try {
+    const r = await fetch('meds.json');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    meds = data.meds.map(computePK);
+  } catch (e) {
+    console.warn('Could not load meds.json — using minimal fallback. To see the full default set, serve the page over HTTP (e.g. `python3 -m http.server` then open localhost:8000).', e);
+    meds = FALLBACK_MEDS.slice();
+  }
+  buildSidebar();
+  render();
+}
+init();
 </script>
 </body>
 </html>
