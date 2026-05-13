@@ -1,27 +1,33 @@
-# Flow: collection-add
+# Flow: add-github
 
-**Purpose:** register a project in Collection's `manifest.json` so it appears as
-a card in the gallery.
+**Purpose:** register an external GitHub repository as a Collection gallery
+card. The repo deploys itself via GitHub Pages; Collection just links to it.
 
-**Invocation:** an AI agent (Claude, gemini, codex, etc.) executes this flow
-when the user says something like "run the collection-add flow on
-`~/Projects/foo`" or "add `https://github.com/halapenyoharry/foo` to
-collection."
+**Use this flow when:** the project lives in its own GitHub repo (or should).
+Bigger projects, multi-file projects, anything that wants its own deploy.
+
+**Use `add-quick` instead when:** the experience is a single HTML file or
+small folder you want to drop into Collection's `experiences/` directly,
+without spinning up a separate repo.
+
+**Invocation:** an AI agent executes this flow when the user says
+"Run the add-github flow on `~/Projects/foo`" or
+"add `https://github.com/halapenyoharry/foo` to collection."
 
 **Inputs:** one of —
-- A local filesystem path (e.g. `~/Projects/foo`)
+- A local filesystem path to a git repo (e.g. `~/Projects/foo`)
 - A GitHub repo URL (e.g. `https://github.com/halapenyoharry/foo`)
 
 **Outputs:**
 - A new entry in `/Users/harold/Projects/collection/manifest.json`
+  with the `url` field pointing at the project's live deploy
 - A commit + push on `main` (after user confirms)
 - A live card on `https://halapenyoharry.github.io/collection/` after Pages
   rebuilds (~30s)
 
-**Operating principle (DO NOT VIOLATE):** the source project is never
-modified. No files added, deleted, renamed, or edited inside the project
-folder. All metadata about how the project appears in Collection lives in
-Collection's `manifest.json`. See `ARCHITECTURE.md` for the full reasoning.
+**Operating principle:** the source project is touched only to enable Pages
+or add a `.gitignore` for sensitive files. Never modify the project's HTML,
+never rename files, never inject anything into the project's content.
 
 ---
 
@@ -29,169 +35,158 @@ Collection's `manifest.json`. See `ARCHITECTURE.md` for the full reasoning.
 
 ### 1. Determine target
 
-- If the input is a path: confirm the directory exists. Read its contents.
-- If the input is a URL: confirm it resolves. Use `gh` CLI for GitHub repos.
-  Avoid cloning unless you actually need to inspect file contents — `gh api
-  repos/{owner}/{name}` for metadata, `gh api repos/{owner}/{name}/contents`
-  for file listings.
+- If the input is a path: confirm the directory exists and is a git repo
+  (`.git` directory present, or `git status` succeeds).
+- If the input is a URL: confirm it resolves via `gh api repos/{owner}/{name}`.
 
-### 2. Find the entry HTML
+If the local path has no remote yet, surface that to the user — pushing the
+project to GitHub is a non-reversible action and requires explicit
+confirmation.
 
-- Look for `index.html` at the project root. That's the entry point.
-- If absent, look for any `*.html` file at root.
-- If multiple, ask the user which one is the entry.
-- If none found, stop and tell the user: "No entry HTML found in <project>.
-  Add an `index.html` to its root, then re-run."
+### 2. Audit for sensitive content (local path only)
 
-### 3. Gather metadata opportunistically (best-effort, schema-tolerant)
+Before pushing a local repo to public GitHub, scan for:
+- `.env`, `credentials.json`, anything matching `*_secret*`, `*_key*`
+- Common secret patterns in tracked files
+  (`api[_-]?key`, `token`, `bearer`, `sk-...`, `ghp_...`, `hf_...`)
+- Symlinks (could leak private paths if resolved)
+- Local-only convention files: `.DS_Store`, `.sync-conflict-*`,
+  `.claude/settings.local.json`, `.vscode/` (user preference)
+
+Surface findings to the user. Build the project's `.gitignore` based on
+their decisions before pushing.
+
+### 3. Find the entry HTML
+
+- Prefer `index.html` at the project root — it makes the bare GH Pages URL
+  work (e.g. `https://owner.github.io/foo/`).
+- If absent at root but present in a subfolder, the manifest can deep-link
+  (e.g. `https://owner.github.io/foo/web-version/`). Bare URL will fall back
+  to README rendering or 404.
+- If no entry HTML at all, stop and ask the user to add one before continuing.
+
+### 4. Gather metadata opportunistically
 
 In priority order, look for sources of pre-fillable answers:
 
-**a. `.project-bible.json` at project root.**
-   If present, read it. Pull whatever fields you recognize:
+**a. `.project-bible.json` at project root** (schema-tolerant, best-effort).
+   Pull whatever fields are recognized:
    - `original_name` or `slug` → suggest as `id`
    - `vision` → suggest as `description`
    - `tags` → suggest as `tags`
-   - `urls.web` → suggest as `url`
-
-   The bible schema is under review. **Do not require any specific field.**
-   Read what's there; ignore what isn't recognized.
 
 **b. `README.md` at project root.**
    - First `# H1` heading → suggest as `title`
    - First non-heading paragraph → suggest as `description`
 
-**c. GitHub repo metadata (if input was a URL).**
+**c. GitHub repo metadata.**
    - Repo description → suggest as `description` if not already set
    - Repo topics → suggest as `tags` if not already set
-   - GH Pages URL (from `gh api repos/{owner}/{name}/pages`) → suggest as `url`
 
-### 4. Determine the live URL
+### 5. Push to GitHub (if not already pushed)
 
-The live URL is what the gallery card will link to. In priority order:
+If the local repo has no remote, ask user to confirm public-or-private,
+then:
+```
+gh repo create halapenyoharry/<name> --public \
+  --description "<from bible/readme>" --source=. --push
+```
 
-1. `urls.web` from the bible.
-2. GH Pages URL if Pages is enabled on the repo (`gh api
-   repos/{owner}/{name}/pages` returns 200 with an `html_url`).
-3. Ask the user. Sample prompt: "What's the live URL for this project?
-   (Leave blank if none yet — we'll fall back to a local copy in
-   `experiences/<slug>/`.)"
+### 6. Enable GitHub Pages
 
-If the user can't provide a URL and there's no Pages deploy, **stop and ask**
-whether they want to:
-- (a) Hold off until they enable Pages on the source repo.
-- (b) Fall back to legacy "copy mode" — clone the project's HTML files into
-  `collection/experiences/<slug>/` and point the manifest at the relative
-  path. This is the transitional mode for the 5 already-borrowed projects;
-  prefer (a) for new additions.
+```
+gh api -X POST repos/halapenyoharry/<name>/pages \
+  -f 'source[branch]=main' -f 'source[path]=/'
+```
 
-### 5. Prompt the user to confirm or edit
+If Pages is already enabled but on a different source, switch with
+`-X PUT`. If enabled on the right source, skip.
 
-Show the user a draft entry. Sample:
+### 7. Wait for the first build
 
+```
+gh api repos/halapenyoharry/<name>/pages/builds/latest --jq .status
+```
+Poll until `built` or `errored`.
+
+### 8. Verify the live URL
+
+- Bare URL responds 200.
+- If deep-linking, confirm the deep URL responds 200.
+
+### 9. Prompt user to confirm or edit the entry
+
+Show:
 ```
 Proposed manifest entry:
   id:          foo
   title:       Foo
-  description: A small generative sketch.
+  description: ...
   url:         https://halapenyoharry.github.io/foo/
-  tags:        ["generative", "art"]
-  added:       2026-04-22
+  tags:        [...]
+  added:       YYYY-MM-DD
 
 OK to add? (y / edit / cancel)
 ```
 
-If `edit`, prompt field-by-field with the current value as default.
+### 10. Validate
 
-### 6. Validate
+- `id` must not collide with existing manifest entry.
+- `id` matches `^[a-z0-9][a-z0-9-]*[a-z0-9]$`.
+- `url` returns 200 from HEAD request.
 
-- `id` must not collide with an existing manifest entry. If it does, append
-  a disambiguating suffix or ask the user.
-- `id` must match `^[a-z0-9][a-z0-9-]*[a-z0-9]$` (matches the bible schema's
-  slug pattern).
-- `url` (if present) should respond 200 to a HEAD request. If it 404s, warn
-  but allow override — the project might be mid-deploy.
+### 11. Write entry to `manifest.json`
 
-### 7. Write the entry
-
-Append the new entry to `experiences` array in
-`/Users/harold/Projects/collection/manifest.json`. Preserve existing
-formatting (2-space indent, trailing newline).
-
-Entry shape:
-
+Append to `experiences` array. Entry shape:
 ```json
 {
   "id": "foo",
   "title": "Foo",
-  "description": "A small generative sketch.",
+  "description": "A short sentence.",
   "url": "https://halapenyoharry.github.io/foo/",
-  "tags": ["generative", "art"],
+  "tags": ["..."],
   "added": "YYYY-MM-DD"
 }
 ```
 
-**Note:** the `path` field used by today's manifest entries (`experiences/<slug>/index.html`)
-is for the legacy copy-in-collection mode. For new link-out entries, use
-`url` instead. Both can coexist; the gallery shell should treat
-`url || path` as the click target. (If the gallery shell only handles
-`path` today, this flow is the trigger to update it.)
+### 12. Commit and push collection
 
-### 8. Commit and push
+Always commit as `halapenyoharry` (verify `git config user.name`).
+Never use `--no-verify` or signing bypasses.
 
-Use git from the collection repo. Commit message format:
+### 13. Verify end-to-end
 
-```
-Add <id> to collection
-
-<one-line description of the project>
-
-URL: <url-or-path>
-Tags: <tags>
-```
-
-Always commit as `halapenyoharry` (per Harold's CLAUDE.md). Confirm
-`git config user.name` returns `halapenyoharry` before committing.
-
-Push to `origin/main`.
-
-### 9. Verify
-
-- Wait ~30 seconds for GH Pages to rebuild.
+- Wait ~30 seconds for collection's Pages to rebuild.
 - Poll `gh api repos/halapenyoharry/collection/pages/builds/latest` until
-  status is `built`.
+  the new commit's SHA appears with `status: built`.
 - Hit `https://halapenyoharry.github.io/collection/manifest.json` and
   confirm the new entry appears.
-- (Optional) Hit the live URL from the entry to confirm it loads.
-- Report success to the user with the gallery URL.
+- Hit the gallery URL and confirm the card.
 
 ---
 
 ## Things this flow MUST refuse
 
-- Editing files inside the source project. (The source is sacred. No nav
-  bars, no `data-experience-id`, no renames.)
+- Editing files inside the source project (no nav bars, no
+  `data-experience-id`, no renames).
 - Inventing descriptions or tags the user didn't provide and the bible
   doesn't contain. Ask instead.
-- Modifying the bible schema or the bible file in the source project.
+- Pushing a local repo to a NEW public GitHub remote without explicit
+  user authorization (this is a blast-radius action).
 - Force-pushing or amending commits.
 
 ## Things this flow MAY do as a courtesy
 
-- Suggest enabling GH Pages on the source repo if it isn't enabled and the
-  user wants a link-out card. Show the `gh api -X POST` command; let the
-  user run it.
-- Suggest writing a missing `index.html` for the source repo, but only if
-  the user explicitly asks. Don't just do it.
+- Suggest writing a missing `index.html` for the source repo — but only
+  if the user explicitly asks. Don't add it unprompted.
+- Suggest standard `.gitignore` entries before the initial push.
 
 ## Failure modes
 
-- **Source project doesn't exist:** stop; ask user to confirm path/URL.
-- **No entry HTML found:** stop; tell user what's missing.
-- **Live URL 404s:** warn; allow override.
-- **Manifest write fails:** report error; do not commit a partial state.
-- **Pages build errors after push:** report; offer to revert the manifest
-  entry.
+- **Source repo doesn't exist:** stop; ask user to confirm path/URL.
+- **No entry HTML:** stop; ask user to add one.
+- **Pages build errors:** report; offer to revert the manifest entry.
+- **URL 404s:** warn; allow override.
 
 ## Related files
 
@@ -199,5 +194,5 @@ Push to `origin/main`.
   writes to.
 - `/Users/harold/Projects/collection/ARCHITECTURE.md` — the design this
   flow implements.
-- `/Users/harold/Projects/collection/index.html` — the gallery shell that
-  reads the manifest at runtime.
+- `/Users/harold/Projects/collection/flows/add-quick.md` — for in-repo
+  experiences that don't justify a separate GitHub repo.
