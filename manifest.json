@@ -46,7 +46,7 @@
       "id": "throatsinging-simulator",
       "title": "Throat Singing Simulator",
       "description": "Web Audio synthesis of khoomei, sygyt, and kargyraa styles with live voice controls.",
-      "path": "experiences/throatsinging-simulator/index.html",
+      "url": "https://halapenyoharry.github.io/throatsinging-simulator/web-version/",
       "tags": ["audio", "synthesis", "web-audio"],
       "added": "2026-04-18"
     },
