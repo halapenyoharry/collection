@@ -1,8 +1,10 @@
 # Collection — Architecture
 
-The proposed shape for how Collection participates in your wider project graph.
-Not yet fully implemented; today's repo is a transitional snapshot (see
-"Migration path" below).
+The shape for how Collection participates in your wider project graph.
+The link-out target state is now reached: the six borrowed projects each
+have their own GitHub repo + Pages deploy, and Collection just links.
+Collection also supports a "quick" in-repo mode for small experiences
+that don't justify their own repo.
 
 ## The contract
 
@@ -17,9 +19,20 @@ That's it. **The project itself doesn't need any Collection-specific files.**
 All metadata about how a project appears in the gallery lives in
 **Collection's** `manifest.json`, not in the project.
 
-If a project happens to have a `.project-bible.json`, `collection-add` reads
-it opportunistically as input — but Collection never depends on the bible
-schema. (Schema is under review; binding to it would be a tight coupling.)
+If a project happens to have a `.project-bible.json`, the add-github flow
+reads it opportunistically as input — but Collection never depends on the
+bible schema. (Schema is under review; binding to it would be a tight
+coupling.)
+
+## Two ways to add a card
+
+| Flow | When to use | Manifest field |
+|---|---|---|
+| [`flows/add-github.md`](flows/add-github.md) | Project lives in its own GitHub repo with its own Pages deploy. Bigger projects, multi-file, independent iteration. | `url` |
+| [`flows/add-quick.md`](flows/add-quick.md) | Single HTML file or small folder you want to publish now. Lives inside Collection's repo. No separate deploy. | `path` |
+
+Both flows write a manifest entry. The gallery shell renders either kind
+identically — cards just open `entry.url || entry.path`.
 
 ## Diagram
 
@@ -43,7 +56,7 @@ flowchart TB
     %% Collection
     subgraph COLLECTION ["Collection (meta-gallery repo)"]
         direction TB
-        ADD["collection-add CLI<br/>(prompts user, optionally<br/>reads bible if present)"]
+        ADD["add-github / add-quick flows<br/>(prompts user, optionally<br/>reads bible if present)"]
         MAN["manifest.json<br/><b>← single source of truth</b><br/>for what's in the gallery"]
         SHELL["index.html (gallery shell)"]
     end
@@ -111,22 +124,30 @@ flowchart TB
 |---|---|---|
 | Source project | Entry HTML, presentation, dependencies, its own deploy | Anything Collection-related |
 | Collection / `manifest.json` | Title, description, tags, URL — all per-import data | Project content |
-| `collection-add` | Prompting user, writing manifest entries, *optionally* reading bibles | Editing source projects |
+| `add-github` / `add-quick` flows | Prompting user, writing manifest entries, *optionally* reading bibles | Editing source projects |
 
 ## Data flow when adding a project
 
-1. Run `collection-add <path-or-url>` (e.g. `~/Projects/foo` or
-   `https://github.com/halapenyoharry/foo`).
-2. Tool checks if a `.project-bible.json` is present. If yes, pre-fill
-   answers from it (best-effort, schema-tolerant: pull whichever fields
-   it recognizes, ignore the rest).
-3. Tool prompts user for any missing fields — title, description, tags,
-   live URL. (Optionally: `--auto` mode pre-fills via gemini reading
-   the repo first.)
-4. Tool appends an entry to Collection's `manifest.json`.
-5. User commits + pushes. Pages rebuilds. Card appears.
+**Via `add-github` (link-out):**
+1. Agent runs the flow on a GitHub repo URL or local git repo path.
+2. Audits source for sensitive files (`.env`, secrets, symlinks). Builds
+   `.gitignore` if pushing for the first time.
+3. Reads `.project-bible.json` opportunistically; falls back to README and
+   GitHub repo metadata. Asks user for missing fields.
+4. Ensures Pages is enabled on the source repo. Waits for build.
+5. Appends a `url`-based entry to `manifest.json`. Commits + pushes
+   collection. Source project HTML is never touched.
 
-The source project is never touched.
+**Via `add-quick` (in-repo):**
+1. Agent runs the flow with a single HTML file path, a small folder, or
+   nothing (to scaffold from `experiences/template/`).
+2. Asks for a slug. Copies the source into `experiences/<slug>/`.
+3. Health-checks for external dependencies; asks the user how to handle
+   any found.
+4. Asks for title/description/tags (prefilled from `<title>`/meta when
+   possible).
+5. Appends a `path`-based entry to `manifest.json`. Commits + pushes
+   collection.
 
 ## What Collection NEVER does
 
