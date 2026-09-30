@@ -1,0 +1,214 @@
+/* Root reset / variables mimicking exoskeleton/collection environment */
+:root {
+  --suite-bg: #0a0a0f;
+  --suite-surface: #13131a;
+  --suite-border: #2a2a3a;
+  --suite-accent: #7c6af5;
+  --suite-text: #e8e8f0;
+  --suite-muted: #6a6a8a;
+  --suite-active: #4ecca3;
+}
+
+/* Base Visualization Container */
+.procedural-viz-root {
+  width: 100%;
+  height: 100%;
+  background: var(--suite-bg);
+  color: var(--suite-text);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.procedural-viz-root canvas,
+.procedural-viz-root svg,
+.procedural-viz-root iframe {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Control Panel Root */
+.procedural-suite-control-root {
+  width: 100%;
+  height: 100%;
+  background: var(--suite-bg);
+  color: var(--suite-text);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.control-header {
+  padding: 1rem;
+  border-bottom: 1px solid var(--suite-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.control-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--suite-accent);
+}
+
+.panel-status-indicators {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 12px;
+  background: var(--suite-surface);
+  border: 1px solid var(--suite-border);
+  font-size: 0.75rem;
+  color: var(--suite-muted);
+}
+
+.status-pill.active {
+  color: var(--suite-text);
+  border-color: var(--suite-active);
+}
+
+.status-pill .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--suite-muted);
+}
+
+.status-pill.active .dot {
+  background: var(--suite-active);
+  box-shadow: 0 0 6px var(--suite-active);
+}
+
+/* Bitwig-style Instrument Rack */
+.instrument-rack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.instrument-module {
+  background: var(--suite-surface);
+  border: 1px solid var(--suite-border);
+  border-radius: 6px;
+  width: calc(50% - 0.5rem);
+  min-width: 260px;
+  display: flex;
+  flex-direction: column;
+  opacity: 0.5;
+  transition: opacity 0.2s, border-color 0.2s;
+}
+
+.instrument-module.active {
+  opacity: 1;
+  border-color: var(--suite-accent);
+}
+
+.module-header {
+  padding: 0.5rem 0.75rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid var(--suite-border);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.module-controls {
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.module-controls.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem 1rem;
+}
+
+/* Individual Controls */
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.control-group label {
+  font-size: 0.7rem;
+  color: var(--suite-muted);
+  text-transform: uppercase;
+}
+
+.control-group input[type="range"] {
+  width: 100%;
+  accent-color: var(--suite-accent);
+}
+
+.control-group select {
+  width: 100%;
+  background: var(--suite-bg);
+  color: var(--suite-text);
+  border: 1px solid var(--suite-border);
+  border-radius: 4px;
+  padding: 0.2rem;
+  font-size: 0.8rem;
+}
+
+.control-group input[type="checkbox"] {
+  accent-color: var(--suite-accent);
+  width: 16px;
+  height: 16px;
+  margin-top: 0.2rem;
+}
+
+.color-picker-group {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.color-picker-group input[type="color"] {
+  width: 32px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--suite-border);
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+}
+
+/* Triggers / Bangs */
+.bang-btn {
+  background: var(--suite-border);
+  color: var(--suite-text);
+  border: 1px solid var(--suite-muted);
+  border-radius: 4px;
+  padding: 0.4rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  cursor: pointer;
+  margin-top: auto;
+}
+
+.bang-btn:hover {
+  background: var(--suite-accent);
+  border-color: var(--suite-accent);
+  color: #000;
+  font-weight: 600;
+}
+
+.bang-btn:active {
+  transform: translateY(1px);
+}
