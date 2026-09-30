@@ -1,6 +1,6 @@
-import { sendOsc, onOsc, retain } from "../../osc";
+import { sendOsc, subscribeOsc, retain } from "../../osc";
 
-export { sendOsc, onOsc, retain };
+export { sendOsc, subscribeOsc, retain };
 
 // --- Channel paths for the Procedural Visuals Suite ---
 

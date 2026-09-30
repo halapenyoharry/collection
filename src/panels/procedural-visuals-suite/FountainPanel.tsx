@@ -1,18 +1,9 @@
 import React, { useEffect, useRef } from "react";
 import type { IDockviewPanelProps } from "dockview";
-import { onOsc, sendOsc, retain } from "./channels";
+import { subscribeOsc, sendOsc, retain } from "./channels";
 import type { ProceduralSuiteParams } from "./types";
 import { getAvailableAddress, getControlAddress, getPingAddress } from "./channels";
 import "./Panel.css";
-
-// Fountain config defaults
-let config = {
-  trailFade: 0.2,
-  sources: 1,
-  particleSize: 4,
-  animSpeed: 1.0,
-  colorScheme: 'viridis'
-};
 
 const baseGravity = 0.15;
 
@@ -42,28 +33,31 @@ const interpolators: Record<string, (t: number) => string> = {
 class Particle {
   x: number; y: number; vx: number; vy: number;
   t: number; life: number; decay: number; baseSize: number; size: number;
+  animSpeed: number; colorScheme: string;
 
-  constructor(x: number, y: number, t: number) {
+  constructor(x: number, y: number, t: number, animSpeed: number, particleSize: number, colorScheme: string) {
     this.x = x;
     this.y = y;
-    this.vx = (Math.random() - 0.5) * 6 * config.animSpeed;
-    this.vy = ((Math.random() * -10) - 2) * config.animSpeed;
+    this.animSpeed = animSpeed;
+    this.colorScheme = colorScheme;
+    this.vx = (Math.random() - 0.5) * 6 * animSpeed;
+    this.vy = ((Math.random() * -10) - 2) * animSpeed;
     this.t = t;
     this.life = 1.0;
-    this.decay = (Math.random() * 0.02 + 0.005) * (1 / config.animSpeed);
-    this.baseSize = config.particleSize;
+    this.decay = (Math.random() * 0.02 + 0.005) * (1 / animSpeed);
+    this.baseSize = particleSize;
     this.size = this.baseSize * (0.5 + Math.random() * 0.5);
   }
 
   update() {
     this.x += this.vx;
     this.y += this.vy;
-    this.vy += baseGravity * config.animSpeed;
+    this.vy += baseGravity * this.animSpeed;
     this.life -= this.decay;
   }
 
   draw(ctx: CanvasRenderingContext2D) {
-    const color = interpolators[config.colorScheme](this.t);
+    const color = interpolators[this.colorScheme](this.t);
     ctx.save();
     ctx.globalAlpha = this.life;
     ctx.fillStyle = color;
@@ -79,25 +73,33 @@ export default function FountainPanel(props: IDockviewPanelProps<ProceduralSuite
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const particlesRef = useRef<Particle[]>([]);
 
+  const configRef = useRef({
+    trailFade: 0.2,
+    sources: 1,
+    particleSize: 4,
+    animSpeed: 1.0,
+    colorScheme: 'viridis'
+  });
+
   useEffect(() => {
     const availableAddress = getAvailableAddress(docId, 'fountain');
     retain(availableAddress);
-    sendOsc(availableAddress, [{ type: 'boolean', value: true }]);
+    sendOsc(availableAddress, [{ type: 'bool', value: true }]);
 
-    const unsubPing = onOsc(getPingAddress(docId), () => {
-      sendOsc(availableAddress, [{ type: 'boolean', value: true }]);
+    const unsubPing = subscribeOsc(getPingAddress(docId), () => {
+      sendOsc(availableAddress, [{ type: 'bool', value: true }]);
     });
 
     const unsubs = [
-      onOsc(getControlAddress(docId, 'fountain', 'trailFade'), (_, args) => { config.trailFade = args[0].value; }),
-      onOsc(getControlAddress(docId, 'fountain', 'sources'), (_, args) => { config.sources = args[0].value; }),
-      onOsc(getControlAddress(docId, 'fountain', 'particleSize'), (_, args) => { config.particleSize = args[0].value; }),
-      onOsc(getControlAddress(docId, 'fountain', 'animSpeed'), (_, args) => { config.animSpeed = args[0].value; }),
-      onOsc(getControlAddress(docId, 'fountain', 'colorScheme'), (_, args) => { config.colorScheme = args[0].value; }),
+      subscribeOsc(getControlAddress(docId, 'fountain', 'trailFade'), (_, args) => { configRef.current.trailFade = args[0].value; }),
+      subscribeOsc(getControlAddress(docId, 'fountain', 'sources'), (_, args) => { configRef.current.sources = args[0].value; }),
+      subscribeOsc(getControlAddress(docId, 'fountain', 'particleSize'), (_, args) => { configRef.current.particleSize = args[0].value; }),
+      subscribeOsc(getControlAddress(docId, 'fountain', 'animSpeed'), (_, args) => { configRef.current.animSpeed = args[0].value; }),
+      subscribeOsc(getControlAddress(docId, 'fountain', 'colorScheme'), (_, args) => { configRef.current.colorScheme = args[0].value; }),
     ];
 
     return () => {
-      sendOsc(availableAddress, [{ type: 'boolean', value: false }]);
+      sendOsc(availableAddress, [{ type: 'bool', value: false }]);
       unsubPing();
       unsubs.forEach(u => u());
     };
@@ -119,6 +121,7 @@ export default function FountainPanel(props: IDockviewPanelProps<ProceduralSuite
     let animationFrameId: number;
 
     const loop = () => {
+      const config = configRef.current;
       ctx.fillStyle = `rgba(19, 19, 26, ${config.trailFade})`;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -129,7 +132,7 @@ export default function FountainPanel(props: IDockviewPanelProps<ProceduralSuite
         const t = (i / (config.sources + 1) + Date.now() / 5000) % 1.0;
         const count = Math.floor(Math.random() * 4) + 2;
         for (let j = 0; j < count; j++) {
-          particlesRef.current.push(new Particle(x, y, t));
+          particlesRef.current.push(new Particle(x, y, t, config.animSpeed, config.particleSize, config.colorScheme));
         }
       }
 

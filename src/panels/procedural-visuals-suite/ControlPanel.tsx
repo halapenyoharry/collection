@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import type { IDockviewPanelProps } from "dockview";
-import { onOsc, sendOsc } from "./channels";
+import { subscribeOsc, sendOsc } from "./channels";
 import type { ProceduralSuiteParams, VizType } from "./types";
 import { VIZ_PANELS, getAvailableAddress, getControlAddress, getPingAddress } from "./channels";
 import "./Panel.css";
@@ -36,7 +36,7 @@ export default function ControlPanel(props: IDockviewPanelProps<ProceduralSuiteP
 
     Object.keys(VIZ_PANELS).forEach(viz => {
       const address = getAvailableAddress(docId, viz);
-      const unsub = onOsc(address, (addr, args) => {
+      const unsub = subscribeOsc(address, (addr, args) => {
         const isAvailable = args[0]?.value === true;
         setActivePanels(prev => ({ ...prev, [viz]: isAvailable }));
       });
@@ -50,7 +50,7 @@ export default function ControlPanel(props: IDockviewPanelProps<ProceduralSuiteP
   }, [docId]);
 
   // Generic value change sender
-  const handleControlChange = (viz: string, param: string, value: any, type: string = 'float') => {
+  const handleControlChange = (viz: string, param: string, value: any, type: 'float' | 'int' | 'bool' | 'string' = 'float') => {
     sendOsc(getControlAddress(docId, viz, param), [{ type, value }]);
 
     // Update local state for immediate feedback
@@ -61,7 +61,7 @@ export default function ControlPanel(props: IDockviewPanelProps<ProceduralSuiteP
   };
 
   const handleTrigger = (viz: string, action: string) => {
-    sendOsc(getControlAddress(docId, viz, action), [{ type: 'bang', value: 1 }]);
+    sendOsc(getControlAddress(docId, viz, action), [{ type: 'int', value: 1 }]);
   };
 
   return (
@@ -187,7 +187,7 @@ export default function ControlPanel(props: IDockviewPanelProps<ProceduralSuiteP
             </div>
             <div className="control-group">
               <label>Wireframe</label>
-              <input type="checkbox" checked={topologicalState.wireframe} onChange={e => handleControlChange('topological-surfaces', 'wireframe', e.target.checked, 'boolean')} />
+              <input type="checkbox" checked={topologicalState.wireframe} onChange={e => handleControlChange('topological-surfaces', 'wireframe', e.target.checked, 'bool')} />
             </div>
             <button className="bang-btn" onClick={() => handleTrigger('topological-surfaces', 'resetCamera')}>Reset Cam</button>
           </div>

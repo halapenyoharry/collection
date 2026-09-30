@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { IDockviewPanelProps } from "dockview";
-import { onOsc, sendOsc, retain } from "./channels";
+import { subscribeOsc, sendOsc, retain } from "./channels";
 import type { ProceduralSuiteParams } from "./types";
 import { getAvailableAddress, getControlAddress, getPingAddress } from "./channels";
 import "./Panel.css";
@@ -63,21 +63,21 @@ export default function RecursiveSubdivisionPanel(props: IDockviewPanelProps<Pro
   useEffect(() => {
     const availableAddress = getAvailableAddress(docId, 'recursive-subdivision');
     retain(availableAddress);
-    sendOsc(availableAddress, [{ type: 'boolean', value: true }]);
+    sendOsc(availableAddress, [{ type: 'bool', value: true }]);
 
-    const unsubPing = onOsc(getPingAddress(docId), () => {
-      sendOsc(availableAddress, [{ type: 'boolean', value: true }]);
+    const unsubPing = subscribeOsc(getPingAddress(docId), () => {
+      sendOsc(availableAddress, [{ type: 'bool', value: true }]);
     });
 
     const unsubs = [
-      onOsc(getControlAddress(docId, 'recursive-subdivision', 'depth'), (_, args) => setParams(p => ({ ...p, depth: args[0].value }))),
-      onOsc(getControlAddress(docId, 'recursive-subdivision', 'variation'), (_, args) => setParams(p => ({ ...p, variation: args[0].value / 100 }))),
-      onOsc(getControlAddress(docId, 'recursive-subdivision', 'hue'), (_, args) => setParams(p => ({ ...p, baseHue: args[0].value }))),
-      onOsc(getControlAddress(docId, 'recursive-subdivision', 'new-seed'), () => setParams(p => ({ ...p, seed: Math.floor(Math.random() * 0xFFFFFF) }))),
+      subscribeOsc(getControlAddress(docId, 'recursive-subdivision', 'depth'), (_, args) => setParams(p => ({ ...p, depth: args[0].value }))),
+      subscribeOsc(getControlAddress(docId, 'recursive-subdivision', 'variation'), (_, args) => setParams(p => ({ ...p, variation: args[0].value / 100 }))),
+      subscribeOsc(getControlAddress(docId, 'recursive-subdivision', 'hue'), (_, args) => setParams(p => ({ ...p, baseHue: args[0].value }))),
+      subscribeOsc(getControlAddress(docId, 'recursive-subdivision', 'new-seed'), () => setParams(p => ({ ...p, seed: Math.floor(Math.random() * 0xFFFFFF) }))),
     ];
 
     return () => {
-      sendOsc(availableAddress, [{ type: 'boolean', value: false }]);
+      sendOsc(availableAddress, [{ type: 'bool', value: false }]);
       unsubPing();
       unsubs.forEach(u => u());
     };

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import type { IDockviewPanelProps } from "dockview";
-import { onOsc, sendOsc, retain } from "./channels";
+import { subscribeOsc, sendOsc, retain } from "./channels";
 import type { ProceduralSuiteParams } from "./types";
 import { getAvailableAddress, getControlAddress, getPingAddress } from "./channels";
 import "./Panel.css";
@@ -37,23 +37,23 @@ export default function TopologicalSurfacesPanel(props: IDockviewPanelProps<Proc
 
     const availableAddress = getAvailableAddress(docId, 'topological-surfaces');
     retain(availableAddress);
-    sendOsc(availableAddress, [{ type: 'boolean', value: true }]);
+    sendOsc(availableAddress, [{ type: 'bool', value: true }]);
 
-    const unsubPing = onOsc(getPingAddress(docId), () => {
-      sendOsc(availableAddress, [{ type: 'boolean', value: true }]);
+    const unsubPing = subscribeOsc(getPingAddress(docId), () => {
+      sendOsc(availableAddress, [{ type: 'bool', value: true }]);
     });
 
     const unsubs = [
-      onOsc(getControlAddress(docId, 'topological-surfaces', 'surface'), (_, args) => iframe.contentWindow?.postMessage({ param: 'surface', value: args[0].value }, '*')),
-      onOsc(getControlAddress(docId, 'topological-surfaces', 'shaderMode'), (_, args) => iframe.contentWindow?.postMessage({ param: 'shaderMode', value: args[0].value }, '*')),
-      onOsc(getControlAddress(docId, 'topological-surfaces', 'colorPalette'), (_, args) => iframe.contentWindow?.postMessage({ param: 'colorPalette', value: args[0].value }, '*')),
-      onOsc(getControlAddress(docId, 'topological-surfaces', 'speed'), (_, args) => iframe.contentWindow?.postMessage({ param: 'speed', value: args[0].value }, '*')),
-      onOsc(getControlAddress(docId, 'topological-surfaces', 'wireframe'), (_, args) => iframe.contentWindow?.postMessage({ param: 'wireframe', value: args[0].value }, '*')),
-      onOsc(getControlAddress(docId, 'topological-surfaces', 'resetCamera'), (_, args) => iframe.contentWindow?.postMessage({ param: 'resetCamera' }, '*')),
+      subscribeOsc(getControlAddress(docId, 'topological-surfaces', 'surface'), (_, args) => iframe.contentWindow?.postMessage({ param: 'surface', value: args[0].value }, '*')),
+      subscribeOsc(getControlAddress(docId, 'topological-surfaces', 'shaderMode'), (_, args) => iframe.contentWindow?.postMessage({ param: 'shaderMode', value: args[0].value }, '*')),
+      subscribeOsc(getControlAddress(docId, 'topological-surfaces', 'colorPalette'), (_, args) => iframe.contentWindow?.postMessage({ param: 'colorPalette', value: args[0].value }, '*')),
+      subscribeOsc(getControlAddress(docId, 'topological-surfaces', 'speed'), (_, args) => iframe.contentWindow?.postMessage({ param: 'speed', value: args[0].value }, '*')),
+      subscribeOsc(getControlAddress(docId, 'topological-surfaces', 'wireframe'), (_, args) => iframe.contentWindow?.postMessage({ param: 'wireframe', value: args[0].value }, '*')),
+      subscribeOsc(getControlAddress(docId, 'topological-surfaces', 'resetCamera'), (_, args) => iframe.contentWindow?.postMessage({ param: 'resetCamera' }, '*')),
     ];
 
     return () => {
-      sendOsc(availableAddress, [{ type: 'boolean', value: false }]);
+      sendOsc(availableAddress, [{ type: 'bool', value: false }]);
       unsubPing();
       unsubs.forEach(u => u());
       if (containerRef.current) containerRef.current.innerHTML = '';

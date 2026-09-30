@@ -1,14 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { IDockviewPanelProps } from "dockview";
-import { onOsc, sendOsc, retain } from "./channels";
+import { subscribeOsc, sendOsc, retain } from "./channels";
 import type { ProceduralSuiteParams } from "./types";
 import { getAvailableAddress, getControlAddress, getPingAddress } from "./channels";
 import "./Panel.css";
-
-// Physics params default
-let GRAVITY = 10;
-let RESTITUTION = 0.85;
-let BALL_COUNT = 20;
 
 const MIN_R = 8;
 const MAX_R = 22;
@@ -34,42 +29,49 @@ export default function BouncingBallsPanel(props: IDockviewPanelProps<Procedural
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const ballsRef = useRef<Ball[]>([]);
 
+  // Physics params isolated to panel instance
+  const paramsRef = useRef({
+    gravity: 10,
+    restitution: 0.85,
+    ballCount: 20
+  });
+
   useEffect(() => {
     // 1. Announce presence to Control Panel
     const availableAddress = getAvailableAddress(docId, 'bouncing-balls');
     retain(availableAddress);
-    sendOsc(availableAddress, [{ type: 'boolean', value: true }]);
+    sendOsc(availableAddress, [{ type: 'bool', value: true }]);
 
     // Respond to pings
-    const unsubPing = onOsc(getPingAddress(docId), () => {
-      sendOsc(availableAddress, [{ type: 'boolean', value: true }]);
+    const unsubPing = subscribeOsc(getPingAddress(docId), () => {
+      sendOsc(availableAddress, [{ type: 'bool', value: true }]);
     });
 
     // 2. Listen to Control changes via OSC
-    const unsubCount = onOsc(getControlAddress(docId, 'bouncing-balls', 'count'), (_, args) => {
-      BALL_COUNT = args[0].value;
+    const unsubCount = subscribeOsc(getControlAddress(docId, 'bouncing-balls', 'count'), (_, args) => {
+      paramsRef.current.ballCount = args[0].value;
       const w = canvasRef.current?.width || 800;
       const h = canvasRef.current?.height || 600;
-      while (ballsRef.current.length < BALL_COUNT) ballsRef.current.push(randomBall(w, h));
-      while (ballsRef.current.length > BALL_COUNT) ballsRef.current.pop();
+      while (ballsRef.current.length < paramsRef.current.ballCount) ballsRef.current.push(randomBall(w, h));
+      while (ballsRef.current.length > paramsRef.current.ballCount) ballsRef.current.pop();
     });
 
-    const unsubGrav = onOsc(getControlAddress(docId, 'bouncing-balls', 'gravity'), (_, args) => {
-      GRAVITY = args[0].value;
+    const unsubGrav = subscribeOsc(getControlAddress(docId, 'bouncing-balls', 'gravity'), (_, args) => {
+      paramsRef.current.gravity = args[0].value;
     });
 
-    const unsubRest = onOsc(getControlAddress(docId, 'bouncing-balls', 'restitution'), (_, args) => {
-      RESTITUTION = args[0].value / 100.0;
+    const unsubRest = subscribeOsc(getControlAddress(docId, 'bouncing-balls', 'restitution'), (_, args) => {
+      paramsRef.current.restitution = args[0].value / 100.0;
     });
 
-    const unsubReset = onOsc(getControlAddress(docId, 'bouncing-balls', 'reset'), () => {
+    const unsubReset = subscribeOsc(getControlAddress(docId, 'bouncing-balls', 'reset'), () => {
       const w = canvasRef.current?.width || 800;
       const h = canvasRef.current?.height || 600;
-      ballsRef.current = Array.from({ length: BALL_COUNT }, () => randomBall(w, h));
+      ballsRef.current = Array.from({ length: paramsRef.current.ballCount }, () => randomBall(w, h));
     });
 
     return () => {
-      sendOsc(availableAddress, [{ type: 'boolean', value: false }]);
+      sendOsc(availableAddress, [{ type: 'bool', value: false }]);
       unsubPing(); unsubCount(); unsubGrav(); unsubRest(); unsubReset();
     };
   }, [docId]);
@@ -87,7 +89,7 @@ export default function BouncingBallsPanel(props: IDockviewPanelProps<Procedural
     window.addEventListener('resize', resize);
     resize();
 
-    ballsRef.current = Array.from({ length: BALL_COUNT }, () => randomBall(canvas.width, canvas.height));
+    ballsRef.current = Array.from({ length: paramsRef.current.ballCount }, () => randomBall(canvas.width, canvas.height));
 
     let animationFrameId: number;
     const DT = 1 / 60;
@@ -98,17 +100,18 @@ export default function BouncingBallsPanel(props: IDockviewPanelProps<Procedural
       const balls = ballsRef.current;
 
       // Physics step
+      const { gravity, restitution } = paramsRef.current;
       for (const b of balls) {
-        b.vy += GRAVITY * DT;
+        b.vy += gravity * DT;
         b.vx *= FRICTION;
         b.vy *= FRICTION;
         b.x  += b.vx;
         b.y  += b.vy;
 
-        if (b.x - b.r < 0)  { b.x = b.r;    b.vx = Math.abs(b.vx) * RESTITUTION; }
-        if (b.x + b.r > W)  { b.x = W - b.r; b.vx = -Math.abs(b.vx) * RESTITUTION; }
-        if (b.y - b.r < 0)  { b.y = b.r;    b.vy = Math.abs(b.vy) * RESTITUTION; }
-        if (b.y + b.r > H)  { b.y = H - b.r; b.vy = -Math.abs(b.vy) * RESTITUTION; }
+        if (b.x - b.r < 0)  { b.x = b.r;    b.vx = Math.abs(b.vx) * restitution; }
+        if (b.x + b.r > W)  { b.x = W - b.r; b.vx = -Math.abs(b.vx) * restitution; }
+        if (b.y - b.r < 0)  { b.y = b.r;    b.vy = Math.abs(b.vy) * restitution; }
+        if (b.y + b.r > H)  { b.y = H - b.r; b.vy = -Math.abs(b.vy) * restitution; }
       }
 
       for (let i = 0; i < balls.length; i++) {
@@ -126,7 +129,7 @@ export default function BouncingBallsPanel(props: IDockviewPanelProps<Procedural
             const dvx = a.vx - b.vx, dvy = a.vy - b.vy;
             const dot = dvx * nx + dvy * ny;
             if (dot > 0) {
-              const impulse = dot * RESTITUTION;
+              const impulse = dot * restitution;
               a.vx -= impulse * nx; a.vy -= impulse * ny;
               b.vx += impulse * nx; b.vy += impulse * ny;
             }

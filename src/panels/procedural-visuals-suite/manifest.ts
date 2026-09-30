@@ -10,7 +10,7 @@ export const controlManifest: PanelManifest<ProceduralSuiteParams> = {
   id: "procedural-visuals-control",
   title: "Procedural Suite Control",
   component: ControlPanel,
-  category: "suite",
+  category: "instrument",
   accentColor: "#f5a623",
   glyph: "🎛️",
   capabilities: ["persistence"],
@@ -19,11 +19,11 @@ export const controlManifest: PanelManifest<ProceduralSuiteParams> = {
   },
   osc: {
     emits: [
-      { address: "/procedural-suite/{doc}/*/control/*", args: ["any"], description: "Emits control changes to visualizations" },
+      { address: "/procedural-suite/{doc}/*/control/*", args: ["int"], description: "Emits control changes to visualizations" },
       { address: "/procedural-suite/{doc}/ping", args: [], description: "Pings visualizations for availability" }
     ],
     listens: [
-      { address: "/procedural-suite/{doc}/*/available", args: ["boolean"], description: "Listens for available visualizations" }
+      { address: "/procedural-suite/{doc}/*/available", args: ["bool"], description: "Listens for available visualizations" }
     ]
   }
 };
@@ -38,8 +38,8 @@ export const bouncingBallsManifest: PanelManifest<ProceduralSuiteParams> = {
   capabilities: ["persistence"],
   paramsDefault: { documentId: "default" },
   osc: {
-    emits: [{ address: "/procedural-suite/{doc}/bouncing-balls/available", args: ["boolean"], description: "Reports availability" }],
-    listens: [{ address: "/procedural-suite/{doc}/bouncing-balls/control/*", args: ["any"], description: "Receives control updates" }]
+    emits: [{ address: "/procedural-suite/{doc}/bouncing-balls/available", args: ["bool"], description: "Reports availability" }],
+    listens: [{ address: "/procedural-suite/{doc}/bouncing-balls/control/*", args: ["float"], description: "Receives control updates" }]
   }
 };
 
@@ -53,8 +53,8 @@ export const fountainManifest: PanelManifest<ProceduralSuiteParams> = {
   capabilities: ["persistence"],
   paramsDefault: { documentId: "default" },
   osc: {
-    emits: [{ address: "/procedural-suite/{doc}/fountain/available", args: ["boolean"], description: "Reports availability" }],
-    listens: [{ address: "/procedural-suite/{doc}/fountain/control/*", args: ["any"], description: "Receives control updates" }]
+    emits: [{ address: "/procedural-suite/{doc}/fountain/available", args: ["bool"], description: "Reports availability" }],
+    listens: [{ address: "/procedural-suite/{doc}/fountain/control/*", args: ["float"], description: "Receives control updates" }]
   }
 };
 
@@ -68,8 +68,8 @@ export const recursiveManifest: PanelManifest<ProceduralSuiteParams> = {
   capabilities: ["persistence"],
   paramsDefault: { documentId: "default" },
   osc: {
-    emits: [{ address: "/procedural-suite/{doc}/recursive-subdivision/available", args: ["boolean"], description: "Reports availability" }],
-    listens: [{ address: "/procedural-suite/{doc}/recursive-subdivision/control/*", args: ["any"], description: "Receives control updates" }]
+    emits: [{ address: "/procedural-suite/{doc}/recursive-subdivision/available", args: ["bool"], description: "Reports availability" }],
+    listens: [{ address: "/procedural-suite/{doc}/recursive-subdivision/control/*", args: ["int"], description: "Receives control updates" }]
   }
 };
 
@@ -83,7 +83,7 @@ export const topologicalManifest: PanelManifest<ProceduralSuiteParams> = {
   capabilities: ["persistence"],
   paramsDefault: { documentId: "default" },
   osc: {
-    emits: [{ address: "/procedural-suite/{doc}/topological-surfaces/available", args: ["boolean"], description: "Reports availability" }],
-    listens: [{ address: "/procedural-suite/{doc}/topological-surfaces/control/*", args: ["any"], description: "Receives control updates" }]
+    emits: [{ address: "/procedural-suite/{doc}/topological-surfaces/available", args: ["bool"], description: "Reports availability" }],
+    listens: [{ address: "/procedural-suite/{doc}/topological-surfaces/control/*", args: ["float"], description: "Receives control updates" }]
   }
 };
