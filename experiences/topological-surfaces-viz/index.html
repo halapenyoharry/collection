@@ -1,0 +1,1485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Topological Surfaces & Procedural Shaders</title>
+  
+  <!-- Dyslexic-friendly & high-legibility fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-dark: #06080d;
+      --panel-bg: rgba(13, 17, 26, 0.78);
+      --panel-border: rgba(255, 255, 255, 0.12);
+      --text-main: #f0f4fc;
+      --text-muted: #94a3b8;
+      --accent-cyan: #00f3ff;
+      --accent-magenta: #ff007f;
+      --accent-purple: #a855f7;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --font-ui: 'Atkinson Hyperlegible', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', 'OpenDyslexic Nerd Font', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: var(--font-ui);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    #webgl-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      z-index: 1;
+    }
+
+    /* Vignette & subtle depth gradient */
+    .viewport-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 2;
+      background: radial-gradient(circle at 50% 50%, transparent 40%, rgba(3, 5, 9, 0.75) 100%);
+    }
+
+    /* Top Navigation Header */
+    header {
+      position: absolute;
+      top: 18px;
+      left: 20px;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      pointer-events: auto;
+    }
+
+    .brand-badge {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      padding: 8px 16px;
+      backdrop-filter: blur(14px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    .brand-icon {
+      width: 22px;
+      height: 22px;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta));
+      border-radius: 6px;
+      box-shadow: 0 0 12px rgba(0, 243, 255, 0.5);
+      animation: pulse-glow 3s infinite alternate ease-in-out;
+    }
+
+    @keyframes pulse-glow {
+      0% { filter: drop-shadow(0 0 4px var(--accent-cyan)); }
+      100% { filter: drop-shadow(0 0 10px var(--accent-magenta)); }
+    }
+
+    .brand-title {
+      font-weight: 700;
+      font-size: 15px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      background: linear-gradient(90deg, #ffffff, #c7d2fe);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-subtitle {
+      font-size: 11px;
+      color: var(--accent-cyan);
+      font-family: var(--font-mono);
+      letter-spacing: 0.06em;
+    }
+
+    /* Left Topological HUD */
+    .hud-panel {
+      position: absolute;
+      top: 80px;
+      left: 20px;
+      width: 320px;
+      max-height: calc(100vh - 170px);
+      overflow-y: auto;
+      z-index: 10;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 14px;
+      padding: 16px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s ease;
+    }
+
+    .hud-panel.collapsed {
+      transform: translateX(-360px);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .hud-panel::-webkit-scrollbar {
+      width: 4px;
+    }
+    .hud-panel::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 2px;
+    }
+
+    .hud-section {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .hud-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 6px;
+    }
+
+    .hud-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent-cyan);
+    }
+
+    .surface-name-large {
+      font-size: 18px;
+      font-weight: 700;
+      color: #ffffff;
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .surface-symbol {
+      font-family: var(--font-mono);
+      font-size: 15px;
+      color: var(--accent-magenta);
+      font-weight: 600;
+    }
+
+    /* Metric Grid */
+    .metric-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .metric-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 8px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .metric-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .metric-value {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 600;
+      color: #ffffff;
+    }
+
+    .metric-value.orientable-yes {
+      color: var(--accent-emerald);
+    }
+    .metric-value.orientable-no {
+      color: var(--accent-magenta);
+    }
+
+    .math-block {
+      background: rgba(0, 0, 0, 0.35);
+      border-left: 3px solid var(--accent-purple);
+      border-radius: 0 6px 6px 0;
+      padding: 8px 10px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: #cbd5e1;
+      line-height: 1.45;
+      overflow-x: auto;
+      white-space: pre-wrap;
+    }
+
+    .shader-info-box {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 12px;
+      color: #cbd5e1;
+      line-height: 1.45;
+    }
+
+    .shader-name-badge {
+      display: inline-block;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      margin-bottom: 4px;
+    }
+
+    /* Bottom Quick Dock */
+    .bottom-dock {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    .dock-pill-group {
+      display: flex;
+      gap: 6px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 30px;
+      padding: 5px 8px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+    }
+
+    .pill-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-family: var(--font-ui);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .pill-btn:hover {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .pill-btn.active {
+      background: linear-gradient(135deg, rgba(0, 243, 255, 0.2), rgba(168, 85, 247, 0.25));
+      border-color: rgba(0, 243, 255, 0.5);
+      color: #ffffff;
+      box-shadow: 0 0 14px rgba(0, 243, 255, 0.25);
+    }
+
+    .pill-btn.active.shader-active {
+      background: linear-gradient(135deg, rgba(255, 0, 127, 0.25), rgba(0, 243, 255, 0.25));
+      border-color: rgba(255, 0, 127, 0.6);
+      box-shadow: 0 0 14px rgba(255, 0, 127, 0.3);
+    }
+
+    /* Floating Utilities (HUD toggle, screenshot, fullscreen) */
+    .hud-toggle-btn {
+      position: absolute;
+      top: 18px;
+      left: 310px;
+      z-index: 10;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      color: var(--text-muted);
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      backdrop-filter: blur(12px);
+      transition: all 0.2s ease;
+    }
+
+    .hud-toggle-btn:hover {
+      color: #ffffff;
+      border-color: var(--accent-cyan);
+    }
+
+    /* Stats Indicator */
+    .stats-indicator {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      z-index: 10;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      backdrop-filter: blur(12px);
+      display: flex;
+      gap: 12px;
+    }
+
+    .stats-indicator span b {
+      color: var(--accent-cyan);
+      font-weight: 600;
+    }
+
+    /* lil-gui custom dark theme overrides */
+    .lil-gui {
+      --background-color: rgba(13, 17, 26, 0.85) !important;
+      --text-color: #e2e8f0 !important;
+      --title-background-color: rgba(21, 28, 44, 0.95) !important;
+      --widget-color: rgba(30, 41, 59, 0.9) !important;
+      --hover-color: rgba(51, 65, 85, 0.9) !important;
+      --focus-color: rgba(0, 243, 255, 0.6) !important;
+      --number-color: var(--accent-cyan) !important;
+      --string-color: var(--accent-magenta) !important;
+      font-family: var(--font-ui) !important;
+      border-radius: 12px !important;
+      border: 1px solid var(--panel-border) !important;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5) !important;
+      backdrop-filter: blur(18px) !important;
+      overflow: hidden;
+      top: 18px !important;
+      right: 20px !important;
+    }
+
+    .lil-gui .title {
+      font-weight: 700 !important;
+      letter-spacing: 0.05em !important;
+      text-transform: uppercase !important;
+      font-size: 11px !important;
+      color: var(--accent-cyan) !important;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+    }
+
+    /* Key hints helper */
+    .shortcut-tag {
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: #e2e8f0;
+    }
+
+    @media (max-width: 900px) {
+      .hud-panel {
+        width: calc(100vw - 40px);
+        max-height: 40vh;
+      }
+      .hud-toggle-btn {
+        display: none;
+      }
+      .bottom-dock {
+        width: 96%;
+      }
+      .dock-pill-group {
+        overflow-x: auto;
+        max-width: 100%;
+        scrollbar-width: none;
+      }
+    }
+  </style>
+
+  <!-- Import maps polyfill & Three.js ES modules via CDN -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+      "lil-gui": "https://cdn.jsdelivr.net/npm/lil-gui@0.19/+esm"
+    }
+  }
+  </script>
+</head>
+<body>
+
+  <canvas id="webgl-canvas"></canvas>
+  <div class="viewport-overlay"></div>
+
+  <!-- Header Branding -->
+  <header>
+    <div class="brand-badge">
+      <div class="brand-icon"></div>
+      <div>
+        <div class="brand-title">Topological Surfaces</div>
+        <div class="brand-subtitle">Procedural Manifold Visualizer</div>
+      </div>
+    </div>
+  </header>
+
+  <button class="hud-toggle-btn" id="btn-toggle-hud" title="Toggle Info HUD (H)">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+      <line x1="9" y1="3" x2="9" y2="21"></line>
+    </svg>
+  </button>
+
+  <!-- Left Topological HUD Information Card -->
+  <div class="hud-panel" id="hud-panel">
+    <div class="hud-section">
+      <div class="hud-header">
+        <span class="hud-title">Manifold Topology</span>
+        <span class="shortcut-tag">[1-5]</span>
+      </div>
+      <div class="surface-name-large">
+        <span id="hud-surface-name">Klein Bottle</span>
+        <span class="surface-symbol" id="hud-surface-symbol">𝕶²</span>
+      </div>
+      <div id="hud-surface-desc" style="font-size: 12px; color: var(--text-muted); line-height: 1.4;">
+        Figure-8 self-intersecting immersion of the non-orientable closed 2D manifold.
+      </div>
+
+      <div class="metric-grid">
+        <div class="metric-card">
+          <span class="metric-label">Euler Char (χ)</span>
+          <span class="metric-value" id="hud-euler">0</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Orientability</span>
+          <span class="metric-value orientable-no" id="hud-orient">Non-Orientable</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Boundary (∂M)</span>
+          <span class="metric-value" id="hud-boundary">∅ (Closed)</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Embedding Space</span>
+          <span class="metric-value" id="hud-dimension">ℝ³ Immersion</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="hud-section">
+      <div class="hud-header">
+        <span class="hud-title">Parametric Equations</span>
+      </div>
+      <div class="math-block" id="hud-math">r = c + cos(u/2)·sin(v) - sin(u/2)·sin(2v)
+z = sin(u/2)·sin(v) + cos(u/2)·sin(2v)
+x = r·cos(u),  y = r·sin(u)</div>
+    </div>
+
+    <div class="hud-section">
+      <div class="hud-header">
+        <span class="hud-title">Active Shader Algorithm</span>
+        <span class="shortcut-tag">[Q,W,E,R]</span>
+      </div>
+      <div class="shader-info-box">
+        <div class="shader-name-badge" id="hud-shader-title">Wave Ripple Interference</div>
+        <div id="hud-shader-desc">
+          Multiple harmonic point sources radiating waves across the manifold metric. Caustics form at constructive interference crests, with Fresnel edge highlighting.
+        </div>
+      </div>
+    </div>
+
+    <div class="hud-section" style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px;">
+      <div style="font-size: 11px; color: var(--text-muted); display: flex; flex-direction: column; gap: 4px;">
+        <div><b>Orbit:</b> Left-click + drag</div>
+        <div><b>Pan:</b> Right-click + drag</div>
+        <div><b>Zoom:</b> Scroll wheel</div>
+        <div><b>Shortcuts:</b> <span class="shortcut-tag">Space</span> Pause • <span class="shortcut-tag">H</span> HUD • <span class="shortcut-tag">C</span> Reset Cam</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Floating Selector Bar -->
+  <div class="bottom-dock">
+    <!-- Surface Pills -->
+    <div class="dock-pill-group">
+      <button class="pill-btn" data-surface="sphere"><span class="shortcut-tag">1</span> Sphere</button>
+      <button class="pill-btn" data-surface="torus"><span class="shortcut-tag">2</span> Torus</button>
+      <button class="pill-btn" data-surface="mobius"><span class="shortcut-tag">3</span> Möbius Strip</button>
+      <button class="pill-btn active" data-surface="klein"><span class="shortcut-tag">4</span> Klein Bottle</button>
+      <button class="pill-btn" data-surface="trefoil"><span class="shortcut-tag">5</span> Trefoil Knot</button>
+    </div>
+
+    <!-- Shader Pills -->
+    <div class="dock-pill-group">
+      <button class="pill-btn active shader-active" data-shader="0"><span class="shortcut-tag">Q</span> 🌊 Wave Ripple</button>
+      <button class="pill-btn" data-shader="1"><span class="shortcut-tag">W</span> 🌐 UV Conformal Grid</button>
+      <button class="pill-btn" data-shader="2"><span class="shortcut-tag">E</span> 🧫 Cellular Voronoi</button>
+      <button class="pill-btn" data-shader="3"><span class="shortcut-tag">R</span> 🌀 Vector Flow Field</button>
+    </div>
+  </div>
+
+  <!-- Realtime Performance & Stats Indicator -->
+  <div class="stats-indicator">
+    <span>FPS: <b id="stat-fps">60</b></span>
+    <span>Vertices: <b id="stat-verts">13,041</b></span>
+    <span>Faces: <b id="stat-faces">25,600</b></span>
+  </div>
+
+  <!-- Main Application Script (ES Module) -->
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import GUI from 'lil-gui';
+
+    /* =========================================================================
+       1. TOPOLOGICAL METADATA & CONFIGURATION
+       ========================================================================= */
+    const SURFACES_INFO = {
+      sphere: {
+        name: 'Sphere',
+        symbol: '𝕊²',
+        desc: 'Standard simply-connected, compact 2D Riemannian sphere of constant positive Gaussian curvature.',
+        euler: '2',
+        orient: 'Orientable',
+        orientClass: 'orientable-yes',
+        boundary: '∅ (Closed)',
+        dimension: 'ℝ³ Embedded',
+        math: 'x = R · sin(v) · cos(u)\ny = R · cos(v)\nz = R · sin(v) · sin(u)\nu ∈ [0, 2π], v ∈ [0, π]'
+      },
+      torus: {
+        name: 'Torus',
+        symbol: '𝕋² = 𝕊¹ × 𝕊¹',
+        desc: 'Doughnut-shaped genus-1 closed surface formed by rotating a circle around a coplanar axis.',
+        euler: '0',
+        orient: 'Orientable',
+        orientClass: 'orientable-yes',
+        boundary: '∅ (Closed)',
+        dimension: 'ℝ³ Embedded',
+        math: 'x = (R + r·cos(v)) · cos(u)\ny = r · sin(v)\nz = (R + r·cos(v)) · sin(u)\nu, v ∈ [0, 2π]'
+      },
+      mobius: {
+        name: 'Möbius Strip',
+        symbol: 'ℝℙ² ∖ 𝔻²',
+        desc: 'One-sided non-orientable surface with a single boundary component and a continuous half-twist.',
+        euler: '0',
+        orient: 'Non-Orientable',
+        orientClass: 'orientable-no',
+        boundary: '1 loop (𝕊¹)',
+        dimension: 'ℝ³ Embedded',
+        math: 'x = (R + t·cos(u/2)) · cos(u)\ny = (R + t·cos(u/2)) · sin(u)\nz = t · sin(u/2)\nu ∈ [0, 2π], t ∈ [-w, w]'
+      },
+      klein: {
+        name: 'Klein Bottle',
+        symbol: '𝕶²',
+        desc: 'Figure-8 self-intersecting immersion in ℝ³ of the compact, closed non-orientable 2-manifold.',
+        euler: '0',
+        orient: 'Non-Orientable',
+        orientClass: 'orientable-no',
+        boundary: '∅ (Closed)',
+        dimension: 'ℝ³ Immersion',
+        math: 'r = c + cos(u/2)·sin(v) - sin(u/2)·sin(2v)\nz = sin(u/2)·sin(v) + cos(u/2)·sin(2v)\nx = r·cos(u),  y = r·sin(u)\nu, v ∈ [0, 2π]'
+      },
+      trefoil: {
+        name: 'Trefoil Knot',
+        symbol: '3₁ Knot Tube',
+        desc: 'Non-trivial (2,3)-torus knot tube. Topologically homeomorphic to a 2-torus tied in 3-dimensional space.',
+        euler: '0',
+        orient: 'Orientable',
+        orientClass: 'orientable-yes',
+        boundary: '∅ (Closed)',
+        dimension: 'ℝ³ Knot Embedding',
+        math: 'x(t) = sin(t) + 2·sin(2t)\ny(t) = cos(t) - 2·cos(2t)\nz(t) = -sin(3t)\nTube radius r = 0.42 around 3₁ curve'
+      }
+    };
+
+    const SHADERS_INFO = [
+      {
+        title: 'Wave Ripple Interference',
+        desc: 'Multiple harmonic point sources radiating waves across the manifold metric. Caustics form at constructive interference crests, with Fresnel edge highlighting.'
+      },
+      {
+        title: 'UV Conformal Grid & Streamlines',
+        desc: 'Displays the manifold\'s intrinsic chart (u, v) with antialiased grid lines (fwidth) and animated complex analytic potential flow lines.'
+      },
+      {
+        title: 'Cellular / Voronoi Noise (Worley)',
+        desc: 'Procedural Voronoi distance metric in GLSL. Computes glowing cellular membranes, nuclei, and bioluminescent bio-acoustic resonance rings.'
+      },
+      {
+        title: 'Animated Vector Flow Field',
+        desc: 'Divergence-free curl noise (∇ × Ψ). Generates advected stream streaks, eddies, and laminar velocity currents flowing across the surface curvature.'
+      }
+    ];
+
+    /* =========================================================================
+       2. GLSL PROCEDURAL SHADER CODE
+       ========================================================================= */
+    const vertexShader = /* glsl */ `
+      varying vec2 vUv;
+      varying vec3 vNormal;
+      varying vec3 vPosition;
+      varying vec3 vWorldPosition;
+
+      void main() {
+        vUv = uv;
+        vNormal = normalize(normalMatrix * normal);
+        vPosition = position;
+        vec4 worldPos = modelMatrix * vec4(position, 1.0);
+        vWorldPosition = worldPos.xyz;
+        gl_Position = projectionMatrix * viewMatrix * worldPos;
+      }
+    `;
+
+    const fragmentShader = /* glsl */ `
+      precision highp float;
+
+      varying vec2 vUv;
+      varying vec3 vNormal;
+      varying vec3 vPosition;
+      varying vec3 vWorldPosition;
+
+      uniform float uTime;
+      uniform int uShaderMode;       // 0: Wave, 1: UV Grid, 2: Voronoi, 3: Vector Flow
+      uniform int uColorPalette;    // 0: Cyberpunk, 1: Ocean, 2: Solar, 3: Holographic, 4: Void
+      uniform float uSpeed;
+      uniform float uFrequency;
+      uniform float uIntensity;
+      uniform float uRoughness;
+      uniform float uFresnelPower;
+      uniform vec3 uCameraPos;
+      uniform vec3 uLightPos;
+
+      #define PI 3.14159265359
+
+      // --- Math & Hash Helpers ---
+      float hash(vec2 p) {
+        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+      }
+
+      vec2 hash2(vec2 p) {
+        p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
+        return fract(sin(p) * 43758.5453123);
+      }
+
+      vec3 hash3(vec3 p) {
+        p = vec3(dot(p, vec3(127.1, 311.7, 74.7)),
+                 dot(p, vec3(269.5, 183.3, 246.1)),
+                 dot(p, vec3(113.5, 271.9, 124.6)));
+        return fract(sin(p) * 43758.5453123);
+      }
+
+      float noise2D(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+        vec2 u = f * f * (3.0 - 2.0 * f);
+        return mix(mix(hash(i + vec2(0.0, 0.0)), hash(i + vec2(1.0, 0.0)), u.x),
+                   mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+      }
+
+      float fbm2D(vec2 p) {
+        float v = 0.0;
+        float a = 0.5;
+        vec2 shift = vec2(100.0);
+        mat2 rot = mat2(cos(0.5), sin(0.5), -sin(0.5), cos(0.5));
+        for (int i = 0; i < 4; ++i) {
+          v += a * noise2D(p);
+          p = rot * p * 2.0 + shift;
+          a *= 0.5;
+        }
+        return v;
+      }
+
+      // --- Color Palettes ---
+      vec3 getPaletteColor(int paletteId, float t) {
+        t = clamp(t, 0.0, 1.0);
+        if (paletteId == 0) {
+          // Cyberpunk / Neon Synth
+          vec3 c0 = vec3(0.04, 0.02, 0.08);
+          vec3 c1 = vec3(0.65, 0.05, 0.70);
+          vec3 c2 = vec3(0.98, 0.05, 0.55);
+          vec3 c3 = vec3(0.00, 0.95, 0.95);
+          vec3 c4 = vec3(1.00, 1.00, 1.00);
+          if (t < 0.25) return mix(c0, c1, t / 0.25);
+          if (t < 0.50) return mix(c1, c2, (t - 0.25) / 0.25);
+          if (t < 0.75) return mix(c2, c3, (t - 0.50) / 0.25);
+          return mix(c3, c4, (t - 0.75) / 0.25);
+        } else if (paletteId == 1) {
+          // Bioluminescent Abyss
+          vec3 c0 = vec3(0.01, 0.03, 0.07);
+          vec3 c1 = vec3(0.03, 0.22, 0.38);
+          vec3 c2 = vec3(0.06, 0.72, 0.65);
+          vec3 c3 = vec3(0.40, 0.98, 0.82);
+          vec3 c4 = vec3(0.92, 1.00, 0.96);
+          if (t < 0.25) return mix(c0, c1, t / 0.25);
+          if (t < 0.50) return mix(c1, c2, (t - 0.25) / 0.25);
+          if (t < 0.75) return mix(c2, c3, (t - 0.50) / 0.25);
+          return mix(c3, c4, (t - 0.75) / 0.25);
+        } else if (paletteId == 2) {
+          // Solar Flare / Magma Heatmap
+          vec3 c0 = vec3(0.04, 0.01, 0.02);
+          vec3 c1 = vec3(0.62, 0.06, 0.06);
+          vec3 c2 = vec3(0.95, 0.45, 0.05);
+          vec3 c3 = vec3(1.00, 0.88, 0.20);
+          vec3 c4 = vec3(1.00, 1.00, 0.92);
+          if (t < 0.25) return mix(c0, c1, t / 0.25);
+          if (t < 0.50) return mix(c1, c2, (t - 0.25) / 0.25);
+          if (t < 0.75) return mix(c2, c3, (t - 0.50) / 0.25);
+          return mix(c3, c4, (t - 0.75) / 0.25);
+        } else if (paletteId == 3) {
+          // Holographic Prismatic (Cosine Gradient)
+          vec3 a = vec3(0.5, 0.5, 0.5);
+          vec3 b = vec3(0.5, 0.5, 0.5);
+          vec3 c = vec3(1.0, 1.0, 1.0);
+          vec3 d = vec3(0.00, 0.33, 0.67);
+          return clamp(a + b * cos(6.28318 * (c * t + d)), 0.0, 1.0);
+        } else {
+          // Platinum Monolith / Void
+          vec3 c0 = vec3(0.02, 0.03, 0.05);
+          vec3 c1 = vec3(0.18, 0.20, 0.25);
+          vec3 c2 = vec3(0.48, 0.52, 0.60);
+          vec3 c3 = vec3(0.82, 0.88, 0.95);
+          vec3 c4 = vec3(1.00, 1.00, 1.00);
+          if (t < 0.25) return mix(c0, c1, t / 0.25);
+          if (t < 0.50) return mix(c1, c2, (t - 0.25) / 0.25);
+          if (t < 0.75) return mix(c2, c3, (t - 0.50) / 0.25);
+          return mix(c3, c4, (t - 0.75) / 0.25);
+        }
+      }
+
+      // =========================================================================
+      // SHADER ALGORITHM 1: Wave Ripple Interference
+      // =========================================================================
+      vec3 computeWaveInterference(vec2 uv, vec3 pos, float time) {
+        // Orbiting wave emitters in parameter space
+        vec2 s1 = vec2(0.5 + 0.35 * cos(time * 0.85), 0.5 + 0.35 * sin(time * 0.65));
+        vec2 s2 = vec2(0.5 + 0.35 * cos(time * 1.15 + 2.5), 0.5 + 0.35 * sin(time * 0.95 + 1.2));
+        
+        // Toroidal periodic distance for seamless metric propagation
+        vec2 d1_v = abs(uv - s1);
+        d1_v = min(d1_v, 1.0 - d1_v);
+        float d1 = length(d1_v);
+
+        vec2 d2_v = abs(uv - s2);
+        d2_v = min(d2_v, 1.0 - d2_v);
+        float d2 = length(d2_v);
+
+        // 3D coordinate wave emitters
+        vec3 p1 = vec3(2.2 * cos(time * 0.7), 1.5 * sin(time * 0.5), 2.2 * sin(time * 0.7));
+        vec3 p2 = vec3(2.2 * sin(time * 0.6 + 1.0), 1.5 * cos(time * 0.8), 2.2 * cos(time * 0.6 + 1.0));
+        float d3 = length(pos - p1) * 0.35;
+        float d4 = length(pos - p2) * 0.35;
+
+        float k = uFrequency * 16.0;
+        float w1 = sin(d1 * k - time * 4.0) / (1.0 + 3.0 * d1);
+        float w2 = sin(d2 * (k * 1.2) - time * 5.2) / (1.0 + 3.0 * d2);
+        float w3 = sin(d3 * (k * 0.9) - time * 3.8) / (1.0 + 2.2 * d3);
+        float w4 = sin(d4 * (k * 1.1) - time * 4.5) / (1.0 + 2.2 * d4);
+
+        // Standing wave resonance cross-coupling
+        float standing = cos(uv.x * k * 0.75 - time * 2.0) * cos(uv.y * k * 0.75 + time * 1.6);
+        float waveSum = (w1 + w2 + w3 + w4) * 0.6 + standing * 0.2 * uIntensity;
+
+        // Sharp optical caustics
+        float caustic = pow(clamp(abs(waveSum) * 1.7, 0.0, 1.0), 3.8) * 2.0;
+        float t = clamp(waveSum * 0.5 + 0.5, 0.0, 1.0);
+
+        vec3 col = getPaletteColor(uColorPalette, t);
+        float fringe = 0.5 + 0.5 * sin(waveSum * 28.0);
+        col += vec3(caustic) + fringe * 0.22 * getPaletteColor(uColorPalette, fract(t + 0.35));
+        return col;
+      }
+
+      // =========================================================================
+      // SHADER ALGORITHM 2: UV Coordinate Grid & Conformal Flow
+      // =========================================================================
+      vec3 computeConformalGridFlow(vec2 uv, vec3 pos, float time) {
+        // High-contrast, antialiased UV grid lines
+        vec2 st = uv * uFrequency * 1.8;
+        vec2 f = abs(fract(st - 0.5) - 0.5);
+        vec2 df = fwidth(st);
+        vec2 gridVec = smoothstep(vec2(0.0), df * 1.5, f);
+        float grid = 1.0 - min(gridVec.x, gridVec.y);
+
+        // Major subdivisions every 4 units
+        vec2 stMajor = st / 4.0;
+        vec2 fMaj = abs(fract(stMajor - 0.5) - 0.5);
+        vec2 dfMaj = fwidth(stMajor);
+        vec2 gridMajVec = smoothstep(vec2(0.0), dfMaj * 2.2, fMaj);
+        float majorGrid = 1.0 - min(gridMajVec.x, gridMajVec.y);
+
+        // Complex potential: z in complex plane
+        vec2 z = (uv - 0.5) * 6.0;
+        vec2 z1 = vec2(1.2 * cos(time * 0.7), 1.2 * sin(time * 0.7));
+        vec2 z2 = vec2(-1.2 * cos(time * 0.9), -1.2 * sin(time * 0.9));
+        vec2 z3 = vec2(0.9 * sin(time * 0.5), -0.9 * cos(time * 0.6));
+
+        vec2 d1 = z - z1;
+        vec2 d2 = z - z2;
+        vec2 d3 = z - z3;
+
+        float r1 = max(length(d1), 0.06);
+        float r2 = max(length(d2), 0.06);
+        float r3 = max(length(d3), 0.06);
+
+        float theta1 = atan(d1.y, d1.x);
+        float theta2 = atan(d2.y, d2.x);
+        float theta3 = atan(d3.y, d3.x);
+
+        // Streamlines (Psi) and equipotential curves (Phi)
+        float stream = (log(r1) - log(r2) + 0.85 * log(r3)) * 1.5;
+        float potential = (theta1 + theta2 - 1.2 * theta3) * 1.5;
+
+        // Animated pulses flowing along streamlines
+        float streamLines = 0.5 + 0.5 * sin(stream * uFrequency * 1.6 - time * 3.5);
+        float equipotential = 0.5 + 0.5 * sin(potential * uFrequency * 1.4 + time * 2.8);
+        float pulse = smoothstep(0.72, 0.96, streamLines) * 1.2;
+
+        float phase = fract((atan(stream, potential) / 6.28318) + 0.5 + time * 0.06);
+        vec3 col = getPaletteColor(uColorPalette, phase);
+
+        // Modulate with conformal curves
+        col = mix(col * 0.35, col * 1.5 + vec3(pulse), streamLines * 0.55);
+        col += equipotential * 0.22 * getPaletteColor(uColorPalette, fract(phase + 0.5));
+
+        // Overlay glowing coordinate grid lines
+        vec3 gridColor = vec3(0.92, 0.96, 1.0);
+        col = mix(col, gridColor * 1.4, grid * 0.5 * uIntensity);
+        col = mix(col, gridColor * 2.2, majorGrid * 0.9 * uIntensity);
+
+        return col;
+      }
+
+      // =========================================================================
+      // SHADER ALGORITHM 3: Cellular / Voronoi Noise (Worley Noise)
+      // =========================================================================
+      vec3 computeCellularVoronoi(vec2 uv, vec3 pos, float time) {
+        vec2 p = uv * uFrequency * 3.2;
+        vec2 n = floor(p);
+        vec2 f = fract(p);
+
+        float f1 = 8.0;
+        float f2 = 8.0;
+        vec2 bestCellId = vec2(0.0);
+
+        for (int j = -1; j <= 1; j++) {
+          for (int i = -1; i <= 1; i++) {
+            vec2 g = vec2(float(i), float(j));
+            vec2 cellId = n + g;
+            vec2 o = hash2(cellId);
+            // Dynamic cell centroid jitter
+            vec2 center = 0.5 + 0.42 * sin(time * 1.6 + 6.28318 * o);
+            vec2 r = g + center - f;
+            float d = dot(r, r);
+
+            if (d < f1) {
+              f2 = f1;
+              f1 = d;
+              bestCellId = cellId;
+            } else if (d < f2) {
+              f2 = d;
+            }
+          }
+        }
+
+        f1 = sqrt(f1);
+        f2 = sqrt(f2);
+
+        // Edge distance: F2 - F1 (Worley cell borders)
+        float edge = f2 - f1;
+        float edgeGlow = 1.0 - smoothstep(0.02, 0.16, edge);
+
+        // Bioluminescent inner nucleus
+        float nucleus = exp(-20.0 * f1 * f1);
+
+        // Acoustic resonance concentric rings
+        float ripple = 0.5 + 0.5 * cos(38.0 * f1 - time * 4.2);
+
+        // Unique cell color
+        float cellHue = hash(bestCellId);
+        vec3 cellCol = getPaletteColor(uColorPalette, fract(cellHue + time * 0.05));
+
+        // Interior depth gradient
+        vec3 col = cellCol * (0.18 + 0.45 * (1.0 - f1));
+        col += cellCol * ripple * 0.28 * uIntensity;
+
+        // Glowing membrane walls
+        vec3 edgeCol = getPaletteColor(uColorPalette, fract(cellHue + 0.5)) * 2.4;
+        col = mix(col, edgeCol, edgeGlow * uIntensity);
+
+        // Brilliant nucleus centroid
+        col += vec3(1.0, 0.96, 0.92) * nucleus * 2.2;
+
+        return col;
+      }
+
+      // =========================================================================
+      // SHADER ALGORITHM 4: Animated Vector Flow Field
+      // =========================================================================
+      vec3 computeVectorFlow(vec2 uv, vec3 pos, float time) {
+        vec2 p = uv * uFrequency * 2.0;
+
+        // Divergence-free curl noise: V = (dPsi/dy, -dPsi/dx)
+        float eps = 0.035;
+        float psi_y1 = fbm2D(p + vec2(0.0, eps) + vec2(time * 0.22, 0.0));
+        float psi_y0 = fbm2D(p - vec2(0.0, eps) + vec2(time * 0.22, 0.0));
+        float psi_x1 = fbm2D(p + vec2(eps, 0.0) + vec2(0.0, time * 0.22));
+        float psi_x0 = fbm2D(p - vec2(eps, 0.0) + vec2(0.0, time * 0.22));
+
+        vec2 vel = vec2((psi_y1 - psi_y0) / (2.0 * eps), -(psi_x1 - psi_x0) / (2.0 * eps));
+        float speed = length(vel);
+        vec2 dir = vel / (speed + 0.001);
+
+        // Cyclic time-phase streak advection
+        float tPhase1 = fract(time * 1.3);
+        float tPhase2 = fract(time * 1.3 + 0.5);
+
+        vec2 adv1 = p - dir * tPhase1 * 2.0 * uIntensity;
+        vec2 adv2 = p - dir * tPhase2 * 2.0 * uIntensity;
+
+        float streak1 = noise2D(adv1 * 5.5);
+        float streak2 = noise2D(adv2 * 5.5);
+
+        float blendWeight = 2.0 * abs(tPhase1 - 0.5);
+        float streak = mix(streak2, streak1, blendWeight);
+
+        // Radiant velocity filaments
+        float filaments = pow(streak, 2.4) * (1.6 + 3.2 * speed);
+
+        // Vorticity cores / eddies
+        float vorticity = abs(psi_x1 + psi_x0 - 2.0 * fbm2D(p)) / (eps * eps);
+        float eddy = smoothstep(1.8, 9.0, vorticity);
+
+        float flowAngle = atan(dir.y, dir.x) / 6.28318 + 0.5;
+        vec3 baseCol = getPaletteColor(uColorPalette, fract(flowAngle + time * 0.05));
+        vec3 fastCol = getPaletteColor(uColorPalette, clamp(speed * 3.8, 0.0, 1.0));
+
+        vec3 col = mix(baseCol * 0.22, fastCol, clamp(speed * 2.2, 0.0, 1.0));
+        col += filaments * getPaletteColor(uColorPalette, fract(flowAngle + 0.4)) * 1.8 * uIntensity;
+        col += eddy * vec3(1.0, 0.85, 0.45) * 0.9;
+
+        return col;
+      }
+
+      // --- Main Shading & Lighting Integration ---
+      void main() {
+        // Crucial for non-orientable / double-sided manifolds: flip normal if viewing backside
+        vec3 N = normalize(vNormal);
+        if (!gl_FrontFacing) N = -N;
+
+        vec3 V = normalize(uCameraPos - vWorldPosition);
+        vec3 L = normalize(uLightPos - vWorldPosition);
+        vec3 H = normalize(L + V);
+
+        // Half-Lambert diffuse wrap for smooth curvature expression
+        float NdotL = dot(N, L);
+        float wrapDiff = max((NdotL + 0.35) / 1.35, 0.0);
+
+        // Blinn-Phong specular glint
+        float NdotH = max(dot(N, H), 0.0);
+        float spec = pow(NdotH, uRoughness) * 0.9;
+
+        // Fresnel silhouette rim glow
+        float NdotV = max(dot(N, V), 0.0);
+        float fresnel = pow(1.0 - NdotV, uFresnelPower);
+
+        // Select procedural algorithm
+        vec3 procColor = vec3(0.0);
+        float animTime = uTime * uSpeed;
+
+        if (uShaderMode == 0) {
+          procColor = computeWaveInterference(vUv, vPosition, animTime);
+        } else if (uShaderMode == 1) {
+          procColor = computeConformalGridFlow(vUv, vPosition, animTime);
+        } else if (uShaderMode == 2) {
+          procColor = computeCellularVoronoi(vUv, vPosition, animTime);
+        } else if (uShaderMode == 3) {
+          procColor = computeVectorFlow(vUv, vPosition, animTime);
+        }
+
+        // Composite lighting
+        vec3 ambient = procColor * 0.28;
+        vec3 diffuse = procColor * wrapDiff;
+        vec3 specularGlint = vec3(1.0, 0.98, 0.95) * spec;
+        vec3 rimLight = getPaletteColor(uColorPalette, 0.88) * fresnel * 1.25;
+
+        vec3 finalColor = ambient + diffuse + specularGlint + rimLight;
+
+        // Tone-mapping and subtle gamma
+        finalColor = vec3(1.0) - exp(-finalColor * 1.18);
+        finalColor = pow(finalColor, vec3(1.0 / 1.08));
+
+        gl_FragColor = vec4(finalColor, 1.0);
+      }
+    `;
+
+    /* =========================================================================
+       3. GEOMETRY GENERATORS
+       ========================================================================= */
+
+    // Custom Parametric Geometry Generator
+    function createParametricGeometry(func, uSegments, vSegments) {
+      const positions = [];
+      const uvs = [];
+      const indices = [];
+
+      for (let i = 0; i <= uSegments; i++) {
+        const u = i / uSegments;
+        for (let j = 0; j <= vSegments; j++) {
+          const v = j / vSegments;
+          const pt = func(u, v);
+          positions.push(pt.x, pt.y, pt.z);
+          uvs.push(u, v);
+        }
+      }
+
+      for (let i = 0; i < uSegments; i++) {
+        for (let j = 0; j < vSegments; j++) {
+          const a = i * (vSegments + 1) + j;
+          const b = (i + 1) * (vSegments + 1) + j;
+          const c = (i + 1) * (vSegments + 1) + (j + 1);
+          const d = i * (vSegments + 1) + (j + 1);
+          indices.push(a, b, d);
+          indices.push(b, c, d);
+        }
+      }
+
+      const geom = new THREE.BufferGeometry();
+      geom.setIndex(indices);
+      geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+      geom.computeVertexNormals();
+      return geom;
+    }
+
+    // 1. Sphere
+    function createSphereGeometry() {
+      return new THREE.SphereGeometry(2.0, 96, 64);
+    }
+
+    // 2. Torus
+    function createTorusGeometry() {
+      return new THREE.TorusGeometry(2.0, 0.75, 64, 128);
+    }
+
+    // 3. Möbius Strip
+    function createMobiusGeometry() {
+      const R = 2.0;
+      const width = 1.5;
+      return createParametricGeometry((u, v) => {
+        const theta = u * Math.PI * 2;
+        const halfTheta = theta * 0.5;
+        const cosHalf = Math.cos(halfTheta);
+        const sinHalf = Math.sin(halfTheta);
+        const cosTheta = Math.cos(theta);
+        const sinTheta = Math.sin(theta);
+        const t = (v - 0.5) * width;
+
+        const x = (R + t * cosHalf) * cosTheta;
+        const y = (R + t * cosHalf) * sinTheta;
+        const z = t * sinHalf;
+        return new THREE.Vector3(x, y, z);
+      }, 180, 40);
+    }
+
+    // 4. Klein Bottle (Figure-8 Immersion)
+    function createKleinGeometry() {
+      const r0 = 2.2;
+      const s = 0.85;
+      return createParametricGeometry((u, v) => {
+        const uRad = u * Math.PI * 2;
+        const vRad = v * Math.PI * 2;
+        const halfU = uRad * 0.5;
+        const cosHalf = Math.cos(halfU);
+        const sinHalf = Math.sin(halfU);
+        const cosU = Math.cos(uRad);
+        const sinU = Math.sin(uRad);
+
+        const sinV = Math.sin(vRad);
+        const sin2V = Math.sin(2.0 * vRad);
+
+        const r = r0 + s * (cosHalf * sinV - sinHalf * sin2V);
+        const z = s * (sinHalf * sinV + cosHalf * sin2V);
+        const x = r * cosU;
+        const y = r * sinU;
+
+        return new THREE.Vector3(x, y, z);
+      }, 160, 80);
+    }
+
+    // 5. Trefoil Knot
+    function createTrefoilGeometry() {
+      return new THREE.TorusKnotGeometry(1.6, 0.42, 220, 48, 2, 3);
+    }
+
+    /* =========================================================================
+       4. SCENE, CAMERA & LIGHT SETUP
+       ========================================================================= */
+    const canvas = document.getElementById('webgl-canvas');
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      powerPreference: 'high-performance',
+      preserveDrawingBuffer: true
+    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x06080d);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 2.4, 6.2);
+
+    const controls = new OrbitControls(camera, canvas);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.minDistance = 1.5;
+    controls.maxDistance = 25.0;
+
+    // Subtle drifting background particle dust
+    const particleCount = 1200;
+    const particlePositions = new Float32Array(particleCount * 3);
+    for (let i = 0; i < particleCount; i++) {
+      const radius = 12 + Math.random() * 25;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      particlePositions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+      particlePositions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+      particlePositions[i * 3 + 2] = radius * Math.cos(phi);
+    }
+    const particleGeom = new THREE.BufferGeometry();
+    particleGeom.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+    const particleMat = new THREE.PointsMaterial({
+      color: 0x4a6fa5,
+      size: 0.07,
+      transparent: true,
+      opacity: 0.4
+    });
+    const particleSystem = new THREE.Points(particleGeom, particleMat);
+    scene.add(particleSystem);
+
+    /* =========================================================================
+       5. SHADER MATERIAL & MESH INSTANTIATION
+       ========================================================================= */
+    const uniforms = {
+      uTime: { value: 0 },
+      uShaderMode: { value: 0 },
+      uColorPalette: { value: 0 },
+      uSpeed: { value: 1.0 },
+      uFrequency: { value: 5.5 },
+      uIntensity: { value: 1.0 },
+      uRoughness: { value: 26.0 },
+      uFresnelPower: { value: 2.3 },
+      uCameraPos: { value: new THREE.Vector3() },
+      uLightPos: { value: new THREE.Vector3(5.0, 7.0, 6.0) }
+    };
+
+    const manifoldMaterial = new THREE.ShaderMaterial({
+      vertexShader,
+      fragmentShader,
+      uniforms,
+      side: THREE.DoubleSide
+    });
+
+    const wireframeMaterial = new THREE.MeshBasicMaterial({
+      wireframe: true,
+      color: 0x00f3ff,
+      transparent: true,
+      opacity: 0.15,
+      depthTest: true
+    });
+
+    // Precompute all 5 geometries
+    const geometries = {
+      sphere: createSphereGeometry(),
+      torus: createTorusGeometry(),
+      mobius: createMobiusGeometry(),
+      klein: createKleinGeometry(),
+      trefoil: createTrefoilGeometry()
+    };
+
+    // Default: Klein Bottle
+    const currentSurfaceMesh = new THREE.Mesh(geometries.klein, manifoldMaterial);
+    scene.add(currentSurfaceMesh);
+
+    const wireframeMesh = new THREE.Mesh(geometries.klein, wireframeMaterial);
+    wireframeMesh.visible = false;
+    scene.add(wireframeMesh);
+
+    /* =========================================================================
+       6. APPLICATION STATE & GUI
+       ========================================================================= */
+    const appState = {
+      surface: 'klein',
+      shaderMode: 0,
+      colorPalette: 0,
+      speed: 1.0,
+      frequency: 5.5,
+      intensity: 1.0,
+      roughness: 26.0,
+      fresnel: 2.3,
+      wireframe: false,
+      wireframeOpacity: 0.15,
+      autoRotate: true,
+      autoRotateSpeed: 0.8,
+      paused: false,
+      resetCamera: () => {
+        controls.reset();
+        camera.position.set(0, 2.4, 6.2);
+        controls.target.set(0, 0, 0);
+      },
+      takeScreenshot: () => {
+        renderer.render(scene, camera);
+        const dataUrl = renderer.domElement.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.download = `topological-surface-${appState.surface}.png`;
+        link.href = dataUrl;
+        link.click();
+      }
+    };
+
+    function updateSurface(surfaceKey) {
+      if (!geometries[surfaceKey]) return;
+      appState.surface = surfaceKey;
+
+      currentSurfaceMesh.geometry = geometries[surfaceKey];
+      wireframeMesh.geometry = geometries[surfaceKey];
+
+      // Update HUD info
+      const info = SURFACES_INFO[surfaceKey];
+      document.getElementById('hud-surface-name').textContent = info.name;
+      document.getElementById('hud-surface-symbol').textContent = info.symbol;
+      document.getElementById('hud-surface-desc').textContent = info.desc;
+      document.getElementById('hud-euler').textContent = info.euler;
+
+      const orientEl = document.getElementById('hud-orient');
+      orientEl.textContent = info.orient;
+      orientEl.className = `metric-value ${info.orientClass}`;
+
+      document.getElementById('hud-boundary').textContent = info.boundary;
+      document.getElementById('hud-dimension').textContent = info.dimension;
+      document.getElementById('hud-math').textContent = info.math;
+
+      // Update statistics
+      const posAttr = geometries[surfaceKey].getAttribute('position');
+      const idxAttr = geometries[surfaceKey].getIndex();
+      document.getElementById('stat-verts').textContent = (posAttr ? posAttr.count : 0).toLocaleString();
+      document.getElementById('stat-faces').textContent = (idxAttr ? idxAttr.count / 3 : 0).toLocaleString();
+
+      // Update bottom dock pills
+      document.querySelectorAll('[data-surface]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.surface === surfaceKey);
+      });
+
+      // Update GUI dropdown if changed externally
+      if (surfaceController) surfaceController.setValue(surfaceKey);
+    }
+
+    function updateShader(modeIndex) {
+      appState.shaderMode = parseInt(modeIndex, 10);
+      uniforms.uShaderMode.value = appState.shaderMode;
+
+      const info = SHADERS_INFO[appState.shaderMode];
+      document.getElementById('hud-shader-title').textContent = info.title;
+      document.getElementById('hud-shader-desc').textContent = info.desc;
+
+      // Update bottom dock pills
+      document.querySelectorAll('[data-shader]').forEach(btn => {
+        const isActive = parseInt(btn.dataset.shader, 10) === appState.shaderMode;
+        btn.classList.toggle('active', isActive);
+        btn.classList.toggle('shader-active', isActive);
+      });
+
+      if (shaderController) shaderController.setValue(appState.shaderMode);
+    }
+
+    // --- Lil-GUI Panel Setup ---
+    const gui = new GUI({ title: 'Manifold Controls', width: 280 });
+
+    const geomFolder = gui.addFolder('📐 Manifold Geometry');
+    const surfaceController = geomFolder.add(appState, 'surface', {
+      'Sphere (𝕊²)': 'sphere',
+      'Torus (𝕋²)': 'torus',
+      'Möbius Strip': 'mobius',
+      'Klein Bottle (𝕶²)': 'klein',
+      'Trefoil Knot (3₁)': 'trefoil'
+    }).name('Surface').onChange(updateSurface);
+
+    const shaderFolder = gui.addFolder('🎨 Procedural Shader');
+    const shaderController = shaderFolder.add(appState, 'shaderMode', {
+      'Wave Ripple': 0,
+      'UV Conformal Grid': 1,
+      'Cellular Voronoi': 2,
+      'Vector Flow Field': 3
+    }).name('Algorithm').onChange(updateShader);
+
+    shaderFolder.add(appState, 'colorPalette', {
+      'Cyberpunk Neon': 0,
+      'Bioluminescent Ocean': 1,
+      'Solar Magma': 2,
+      'Holographic Prismatic': 3,
+      'Platinum Monolith': 4
+    }).name('Palette').onChange(val => { uniforms.uColorPalette.value = val; });
+
+    const paramsFolder = gui.addFolder('⚡ Dynamics & Tuning');
+    paramsFolder.add(appState, 'speed', 0.0, 3.0, 0.05).name('Speed').onChange(v => { uniforms.uSpeed.value = v; });
+    paramsFolder.add(appState, 'frequency', 1.0, 16.0, 0.1).name('Frequency').onChange(v => { uniforms.uFrequency.value = v; });
+    paramsFolder.add(appState, 'intensity', 0.0, 2.5, 0.05).name('Intensity').onChange(v => { uniforms.uIntensity.value = v; });
+    paramsFolder.add(appState, 'roughness', 4.0, 64.0, 1.0).name('Specular Focus').onChange(v => { uniforms.uRoughness.value = v; });
+    paramsFolder.add(appState, 'fresnel', 0.5, 5.0, 0.1).name('Fresnel Rim').onChange(v => { uniforms.uFresnelPower.value = v; });
+
+    const viewFolder = gui.addFolder('🎥 Viewport & Mesh');
+    viewFolder.add(appState, 'wireframe').name('Wireframe Overlay').onChange(v => { wireframeMesh.visible = v; });
+    viewFolder.add(appState, 'wireframeOpacity', 0.02, 0.8, 0.02).name('Wire Opacity').onChange(v => { wireframeMaterial.opacity = v; });
+    viewFolder.add(appState, 'autoRotate').name('Auto-Rotation');
+    viewFolder.add(appState, 'autoRotateSpeed', 0.1, 4.0, 0.1).name('Rotation Speed');
+    viewFolder.add(appState, 'resetCamera').name('Reset Camera (C)');
+    viewFolder.add(appState, 'takeScreenshot').name('📸 Capture PNG');
+
+    /* =========================================================================
+       7. EVENT LISTENERS & INTERACTION
+       ========================================================================= */
+    // Bottom Dock Button Listeners
+    document.querySelectorAll('[data-surface]').forEach(btn => {
+      btn.addEventListener('click', () => updateSurface(btn.dataset.surface));
+    });
+
+    document.querySelectorAll('[data-shader]').forEach(btn => {
+      btn.addEventListener('click', () => updateShader(btn.dataset.shader));
+    });
+
+    // HUD Toggle
+    const hudPanel = document.getElementById('hud-panel');
+    const btnToggleHud = document.getElementById('btn-toggle-hud');
+    btnToggleHud.addEventListener('click', () => {
+      hudPanel.classList.toggle('collapsed');
+    });
+
+    // Keyboard Shortcuts
+    window.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+
+      switch (e.key.toLowerCase()) {
+        case '1': updateSurface('sphere'); break;
+        case '2': updateSurface('torus'); break;
+        case '3': updateSurface('mobius'); break;
+        case '4': updateSurface('klein'); break;
+        case '5': updateSurface('trefoil'); break;
+        case 'q': updateShader(0); break;
+        case 'w': updateShader(1); break;
+        case 'e': updateShader(2); break;
+        case 'r': updateShader(3); break;
+        case ' ':
+          appState.paused = !appState.paused;
+          break;
+        case 'h':
+          hudPanel.classList.toggle('collapsed');
+          break;
+        case 'c':
+          appState.resetCamera();
+          break;
+        case 'f':
+          if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen();
+          } else {
+            document.exitFullscreen();
+          }
+          break;
+      }
+    });
+
+    // Window Resize Handler
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Initial surface stats
+    updateSurface('klein');
+
+    /* =========================================================================
+       8. ANIMATION LOOP & FPS COUNTER
+       ========================================================================= */
+    const clock = new THREE.Clock();
+    let accumulatedTime = 0;
+    let frameCount = 0;
+    let lastFpsUpdate = 0;
+    const fpsElem = document.getElementById('stat-fps');
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const delta = clock.getDelta();
+      const now = performance.now();
+
+      // FPS Calculation
+      frameCount++;
+      if (now - lastFpsUpdate >= 500) {
+        fpsElem.textContent = Math.round((frameCount * 1000) / (now - lastFpsUpdate));
+        frameCount = 0;
+        lastFpsUpdate = now;
+      }
+
+      if (!appState.paused) {
+        accumulatedTime += delta;
+        uniforms.uTime.value = accumulatedTime;
+
+        if (appState.autoRotate) {
+          const rotDelta = delta * appState.autoRotateSpeed * 0.4;
+          currentSurfaceMesh.rotation.y += rotDelta;
+          currentSurfaceMesh.rotation.x += rotDelta * 0.25;
+          wireframeMesh.rotation.y = currentSurfaceMesh.rotation.y;
+          wireframeMesh.rotation.x = currentSurfaceMesh.rotation.x;
+        }
+
+        // Slowly drift particle dust
+        particleSystem.rotation.y += delta * 0.03;
+      }
+
+      // Update camera and light positions in uniforms
+      uniforms.uCameraPos.value.copy(camera.position);
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>

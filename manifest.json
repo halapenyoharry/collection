@@ -73,6 +73,14 @@
       "url": "https://halapenyoharry.github.io/zero-friction-image-browser/",
       "tags": ["image-browser", "drag-drop", "zero-config"],
       "added": "2026-04-22"
+    },
+    {
+      "id": "topological-surfaces-viz",
+      "title": "Topological Surfaces",
+      "description": "Interactive 3D manifold visualizer with procedural GLSL shaders — explore Klein bottles, Möbius strips, and Boy's surface.",
+      "path": "experiences/topological-surfaces-viz/index.html",
+      "tags": ["math", "topology", "shaders", "three.js", "webgl"],
+      "added": "2026-09-30"
     }
   ]
 }
